@@ -16,7 +16,7 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata = {
-  title: "Białgruz – Toalety przenośne & Kontenery na gruz",
+  title: "BIALGRUZ - wynajem kontenerów - big-bagów - przenośnych toalet",
   description:
     "Białgruz — wynajem toalet przenośnych oraz kontenerów i big bagów na odpady budowlane. Szybkie podstawienie, wywóz i legalna utylizacja w regionie.",
 };
