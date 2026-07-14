@@ -4,7 +4,7 @@ import { Hero, WhySection, StepsSection, Contact } from "@/components/subUI";
 import OfferToilets from "@/components/OfferToilets";
 
 export const metadata = {
-  title: "Toalety przenośne – BIOLGRUZ",
+  title: "Toalety przenośne – BIALGRUZ",
   description: "Wynajem toalet przenośnych na budowy, imprezy i eventy. Szybka dostawa, regularny serwis, ekologiczne rozwiązania.",
 };
 
@@ -36,10 +36,10 @@ export default function ToaletyPage() {
         primary={{ label: "Wybierz toaletę →", href: "#oferta" }}
         secondary={{ label: "Jak to działa", href: "#jak" }}
         phone={phoneBlock}
-        image={{ src: "/toaleta-bialgruz.png", alt: "Toaleta przenośna BIOLGRUZ", w: 440, h: 600 }}
+        image={{ src: "/toaleta-bialgruz.png", alt: "Toaleta przenośna BIALGRUZ", w: 440, h: 600 }}
         stats={[
           { num: "500+", label: "Zadowolonych klientów", pos: "a" },
-          { num: "24h", label: "Czas dostawy", pos: "b" },
+          { num: "12h", label: "Czas dostawy", pos: "b" },
         ]}
       />
 
@@ -53,12 +53,12 @@ export default function ToaletyPage() {
           </>
         }
         features={[
-          { title: "Szybka dostawa", text: "Dostarczamy toaletę w ciągu 24 godzin od zamówienia na terenie całego regionu. Weekendy i święta nie stanowią przeszkody." },
+          { title: "Szybka dostawa", text: "Dostarczamy toaletę w uzgodnionym terminie na terenie całego regionu. Weekendy i święta nie stanowią przeszkody." },
           { title: "Regularny serwis", text: "Zapewniamy czyszczenie, dezynfekcję i uzupełnianie środków według ustalonego harmonogramu — bez niespodzianek." },
           { title: "Ekologiczne środki", text: "Używamy certyfikowanych biologicznych środków rozkładających odpady, bezpiecznych dla środowiska." },
           { title: "Pełna obsługa", text: "Dostawa, montaż, serwis i odbiór — wszystko w jednej cenie. Nie musisz się o nic martwić." },
         ]}
-        image={{ src: "/toaleta-bialgruz.png", alt: "Toaleta BIOLGRUZ" }}
+        image={{ src: "/toaleta-bialgruz.png", alt: "Toaleta BIALGRUZ" }}
       />
 
       <StepsSection
@@ -66,13 +66,13 @@ export default function ToaletyPage() {
         steps={[
           { title: "Formularz online", text: "Wypełnij krótki formularz na stronie — wybierz model toalety, czas wynajmu i termin." },
           { title: "Automatyczna wycena", text: "Cenę zobaczysz od razu na stronie — wyliczana automatycznie, bez czekania na kontakt." },
-          { title: "Dostawa", text: "Dostarczamy i montujemy toaletę we wskazanym miejscu w ciągu 24 godzin." },
+          { title: "Dostawa", text: "Dostarczamy i montujemy toaletę we wskazanym miejscu w ustalonym terminie." },
           { title: "Serwis", text: "Regularnie serwisujemy i na koniec odbieramy sprzęt — bez Twojego zaangażowania." },
         ]}
       />
 
       <Contact mode="toalety" />
-      <Footer copy="© 2025 BIOLGRUZ. Wynajem toalet przenośnych." />
+      <Footer copy="© 2025 BIALGRUZ. Wynajem toalet przenośnych." />
     </>
   );
 }

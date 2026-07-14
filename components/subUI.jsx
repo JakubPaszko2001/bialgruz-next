@@ -74,7 +74,7 @@ export function Hero({ titleTop, titleBottom, desc, badges, primary, secondary, 
               width={image.w}
               height={image.h}
               priority
-              className="h-auto w-full object-contain"
+              className="mx-auto h-auto max-h-[70vh] w-full object-contain"
             />
             {stats.map((s, i) => (
               <div

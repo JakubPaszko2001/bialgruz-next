@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "./supabaseClient";
 
 /* ── Pricing data ── */
 const SERVICES = {
@@ -10,8 +11,8 @@ const SERVICES = {
     quantityLabel: "Ilość worków *",
     sizes: null,
     waste: [
-      { key: "gruz", label: "Gruz", price: "299 zł", sub: "brutto, VAT 8%" },
-      { key: "zmieszane", label: "Zmieszane", price: "390 zł", sub: "brutto, VAT 8%" },
+      { key: "gruz", label: "Gruz", price: "299 zł", base: 299, sub: "brutto, VAT 8%" },
+      { key: "zmieszane", label: "Zmieszane", price: "390 zł", base: 390, sub: "brutto, VAT 8%" },
     ],
   },
   kontener: {
@@ -23,20 +24,77 @@ const SERVICES = {
     ],
     wasteBySize: {
       "5m3": [
-        { key: "gruz", label: "Gruz", price: "390 zł", sub: "brutto, VAT 8%" },
-        { key: "zmieszane", label: "Zmieszane", price: "1190 zł", sub: "brutto, VAT 8%" },
+        { key: "gruz", label: "Gruz", price: "390 zł", base: 390, sub: "brutto, VAT 8%" },
+        { key: "zmieszane", label: "Zmieszane", price: "1190 zł", base: 1190, sub: "brutto, VAT 8%" },
       ],
-      "7m3": [{ key: "zmieszane", label: "Zmieszane", price: "1390 zł", sub: "brutto, VAT 8%" }],
+      "7m3": [{ key: "zmieszane", label: "Zmieszane", price: "1390 zł", base: 1390, sub: "brutto, VAT 8%" }],
     },
   },
 };
 
+/* ── Delivery pricing (ported from Order.jsx) ── */
+const DEPOT = { lat: 53.14717, lon: 23.17618 }; // baza BIALGRUZ
+const TRANSPORT_RATE = 10.8; // zł za km
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function geocode(query) {
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+  const data = await res.json();
+  if (data && data[0]) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  return null;
+}
+
+// Parser współrzędnych / linku do map (jak w Order.jsx)
+function parseCoordinates(input) {
+  if (!input) return null;
+  const m = String(input).trim().match(/(-?\d{1,3}(?:\.\d+))[^0-9-]+(-?\d{1,3}(?:\.\d+))/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]);
+  const lon = parseFloat(m[2]);
+  if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
+}
+
+const PAYMENT_METHODS = [
+  { key: "gotówka", label: "Gotówka" },
+  { key: "karta", label: "Karta / BLIK" },
+  { key: "przelew", label: "Przelew" },
+];
+
+// Kolejny numer zlecenia BIALxxxx (jak w Order.jsx)
+async function generateOrderNumber(table) {
+  const { data, error } = await supabase
+    .from(table)
+    .select("numerZlecenia, id")
+    .order("id", { ascending: false })
+    .limit(1);
+  if (error || !data?.length || !data[0]?.numerZlecenia) return "BIAL0001";
+  const match = data[0].numerZlecenia.match(/BIAL(\d+)/);
+  const next = match ? parseInt(match[1], 10) + 1 : 1;
+  return `BIAL${next.toString().padStart(4, "0")}`;
+}
+
 const TOILET_SERVICES = {
-  t7dni: { title: "Zamów toaletę — 7 dni", quantityLabel: "Ilość toalet *", sizes: null, noWaste: true },
-  t1m1s: { title: "Zamów toaletę — 1 miesiąc", quantityLabel: "Ilość toalet *", sizes: null, noWaste: true },
-  t1m2s: { title: "Zamów toaletę — 1 miesiąc", quantityLabel: "Ilość toalet *", sizes: null, noWaste: true },
-  t1m4s: { title: "Zamów toaletę — 1 miesiąc", quantityLabel: "Ilość toalet *", sizes: null, noWaste: true },
+  t7dni: { title: "Zamów toaletę — 7 dni", quantityLabel: "Ilość toalet *", sizes: null, noWaste: true, base: 199 },
+  t1m1s: { title: "Zamów toaletę — 1 miesiąc", quantityLabel: "Ilość toalet *", sizes: null, noWaste: true, base: 249 },
+  t1m2s: { title: "Zamów toaletę — 1 miesiąc", quantityLabel: "Ilość toalet *", sizes: null, noWaste: true, base: 349 },
+  t1m4s: { title: "Zamów toaletę — 1 miesiąc", quantityLabel: "Ilość toalet *", sizes: null, noWaste: true, base: 479 },
 };
+
+// Limit dojazdu dla toalet: do 100 km cena z listy, powyżej — wycena indywidualna
+const TOILET_FREE_RADIUS_KM = 100;
+
+// Tabele Supabase per tryb
+const TABLE_BY_MODE = { kontenery: "Zamówienia", toalety: "ToaletyZamowienia" };
 
 const SERVICE_LISTS = {
   kontenery: [
@@ -92,11 +150,23 @@ export default function OrderForm({ mode = "kontenery" }) {
   const [selectedWaste, setSelectedWaste] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState({});
+  const [estimatedPrice, setEstimatedPrice] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [priceError, setPriceError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [orderNumber, setOrderNumber] = useState(null);
+  const [useCoords, setUseCoords] = useState(false);
+  const [coordsInput, setCoordsInput] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [individualQuote, setIndividualQuote] = useState(false);
   const [fields, setFields] = useState({
-    name: "", phone: "", email: "", company: "", address: "", city: "", date: "", quantity: "1", notes: "",
+    name: "", phone: "", email: "", company: "", address: "", postcode: "", city: "", date: "", quantity: "1", notes: "",
   });
 
   const svc = currentType ? services[currentType] : null;
+  const isToilet = mode === "toalety";
+  const needsPrice = true; // oba tryby: wymagamy adresu/dojazdu i płatności
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const wasteOptions = useMemo(() => {
@@ -104,6 +174,72 @@ export default function OrderForm({ mode = "kontenery" }) {
     if (svc.sizes) return selectedSize ? svc.wasteBySize[selectedSize] : null;
     return svc.waste;
   }, [svc, selectedSize]);
+
+  // Bazowa cena: toalety = cena usługi, kontenery = cena wg rozmiaru + odpadu
+  const basePrice = useMemo(() => {
+    if (isToilet) return svc?.base ?? null;
+    if (!wasteOptions || !selectedWaste) return null;
+    return wasteOptions.find((w) => w.key === selectedWaste)?.base ?? null;
+  }, [isToilet, svc, wasteOptions, selectedWaste]);
+
+  // Reset wyceny po każdej zmianie wpływającej na cenę
+  function clearEstimate() {
+    setEstimatedPrice(null);
+    setIndividualQuote(false);
+    setPriceError("");
+  }
+
+  async function calcPrice() {
+    if (basePrice === null) {
+      setPriceError(isToilet ? "Najpierw wybierz usługę." : "Najpierw wybierz usługę, rozmiar i rodzaj odpadów.");
+      return;
+    }
+    setPriceLoading(true);
+    setPriceError("");
+    setIndividualQuote(false);
+    try {
+      let coords;
+      if (useCoords) {
+        coords = parseCoordinates(coordsInput);
+        if (!coords) {
+          setEstimatedPrice(null);
+          setPriceError("Podaj poprawne współrzędne lub link do map.");
+          return;
+        }
+      } else {
+        const query = `${fields.address} ${fields.postcode} ${fields.city}`.trim();
+        if (query.length < 6) {
+          setPriceError("Podaj adres, kod pocztowy i miasto dostawy.");
+          return;
+        }
+        coords = await geocode(query);
+        if (!coords) {
+          setEstimatedPrice(null);
+          setPriceError("Nie udało się zlokalizować adresu. Sprawdź dane.");
+          return;
+        }
+      }
+      const distance = calculateDistance(DEPOT.lat, DEPOT.lon, coords.lat, coords.lon);
+      const qty = Math.max(1, parseInt(fields.quantity, 10) || 1);
+
+      if (isToilet) {
+        // do 100 km cena z listy, powyżej — wycena indywidualna
+        if (distance > TOILET_FREE_RADIUS_KM) {
+          setEstimatedPrice(null);
+          setIndividualQuote(true);
+        } else {
+          setEstimatedPrice(basePrice * qty);
+        }
+      } else {
+        setEstimatedPrice(Math.round((basePrice + distance * TRANSPORT_RATE) * qty));
+      }
+    } catch {
+      setEstimatedPrice(null);
+      setPriceError("Błąd wyceny. Spróbuj ponownie.");
+    } finally {
+      setPriceLoading(false);
+    }
+  }
 
   function setField(k, v) {
     setFields((f) => ({ ...f, [k]: v }));
@@ -114,29 +250,102 @@ export default function OrderForm({ mode = "kontenery" }) {
     setSelectedSize(null);
     setSelectedWaste(null);
     setErrors((e) => ({ ...e, service: false }));
+    clearEstimate();
   }
 
-  function submit() {
+  async function submit() {
     const errs = {};
     if (!currentType) errs.service = true;
-    ["name", "phone", "address", "city", "date"].forEach((k) => {
+    ["name", "phone", "date"].forEach((k) => {
       if (!fields[k].trim()) errs[k] = true;
     });
+    if (useCoords) {
+      if (!parseCoordinates(coordsInput)) errs.coords = true;
+    } else {
+      ["address", "postcode", "city"].forEach((k) => {
+        if (!fields[k].trim()) errs[k] = true;
+      });
+    }
     if (svc && svc.sizes && !selectedSize) errs.size = true;
     if (svc && !svc.noWaste && !selectedWaste) errs.waste = true;
+    if (needsPrice && !paymentMethod) errs.platnosc = true;
 
     setErrors(errs);
     if (Object.keys(errs).length) return;
-    setSubmitted(true);
+
+    // Wymagamy policzonej wyceny (lub potwierdzonej wyceny indywidualnej dla toalet)
+    if (needsPrice && estimatedPrice === null && !individualQuote) {
+      setPriceError(
+        isToilet
+          ? "Sprawdź dostępność / koszt dostawy przed wysłaniem."
+          : "Oblicz szacowany koszt dostawy przed wysłaniem."
+      );
+      return;
+    }
+
+    // Etykiety zgodne z cennikiem / panelem admin
+    const serviceLabel = serviceList.find((s) => s.key === currentType)?.label || "";
+    const sizeLabel = selectedSize ? svc.sizes?.find((s) => s.key === selectedSize)?.label : "";
+    const rodzajuslugi = svc?.sizes ? `${serviceLabel} ${sizeLabel}`.trim() : serviceLabel;
+    const rodzajodpadu = wasteOptions?.find((w) => w.key === selectedWaste)?.label || null;
+
+    const [firstName, ...rest] = fields.name.trim().split(/\s+/);
+    const message = [fields.notes.trim(), `Ilość: ${fields.quantity}`].filter(Boolean).join(" | ");
+    const coords = useCoords ? parseCoordinates(coordsInput) : null;
+
+    const payload = {
+      name: firstName || fields.name.trim(),
+      forname: rest.join(" ") || null,
+      phone: fields.phone.trim(),
+      email: fields.email.trim() || null,
+      nip: fields.company.trim() || null,
+      rodzajuslugi,
+      rodzajodpadu,
+      address: useCoords ? "" : fields.address.trim(),
+      postcode: useCoords ? "" : fields.postcode.trim(),
+      city: useCoords ? "" : fields.city.trim(),
+      koordynaty: coords ? `${coords.lat}, ${coords.lon}` : null,
+      message,
+      platnosc: paymentMethod || null,
+      szacowany: individualQuote ? "Wycena indywidualna" : estimatedPrice != null ? estimatedPrice.toString() : null,
+      dataDostawy: fields.date || null,
+      Status: "Do realizacji",
+    };
+
+    const table = TABLE_BY_MODE[mode] || TABLE_BY_MODE.kontenery;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const numerZlecenia = await generateOrderNumber(table);
+      const { error } = await supabase.from(table).insert([{ ...payload, numerZlecenia }]);
+      if (error) throw error;
+      setOrderNumber(numerZlecenia);
+      setSubmitted(true);
+    } catch (err) {
+      console.error("Błąd zapisu zamówienia:", err);
+      const detail = err?.message || err?.details || err?.hint || "";
+      setSubmitError(
+        `Nie udało się wysłać zamówienia. Spróbuj ponownie lub zadzwoń do nas.${detail ? ` (${detail})` : ""}`
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function reset() {
-    setFields({ name: "", phone: "", email: "", company: "", address: "", city: "", date: "", quantity: "1", notes: "" });
+    setFields({ name: "", phone: "", email: "", company: "", address: "", postcode: "", city: "", date: "", quantity: "1", notes: "" });
     setCurrentType(null);
     setSelectedSize(null);
     setSelectedWaste(null);
     setErrors({});
     setSubmitted(false);
+    setSubmitError("");
+    setOrderNumber(null);
+    setUseCoords(false);
+    setCoordsInput("");
+    setPaymentMethod("");
+    setIndividualQuote(false);
+    clearEstimate();
   }
 
   return (
@@ -174,21 +383,8 @@ export default function OrderForm({ mode = "kontenery" }) {
                     <OptCard key={s.key} item={s} selected={currentType === s.key} error={errors.service} onClick={() => pickService(s.key)} />
                   ))}
                 </div>
-
-                <hr className={dividerCls} />
-                <div className={sectionLabelCls}>Dane kontaktowe</div>
-
-                <Field label="Imię i nazwisko *" error={errors.name}>
-                  <input className={inputCls} placeholder="Jan Kowalski" value={fields.name} onChange={(e) => setField("name", e.target.value)} />
-                </Field>
-                <Field label="Telefon *" error={errors.phone}>
-                  <input className={inputCls} placeholder="+48 500 000 000" value={fields.phone} onChange={(e) => setField("phone", e.target.value)} />
-                </Field>
-                <Field label="E-mail">
-                  <input className={inputCls} type="email" placeholder="jan@firma.pl" value={fields.email} onChange={(e) => setField("email", e.target.value)} />
-                </Field>
-                <Field label="Firma (opcjonalnie)">
-                  <input className={inputCls} placeholder="Nazwa firmy / NIP" value={fields.company} onChange={(e) => setField("company", e.target.value)} />
+                <Field label={svc ? svc.quantityLabel : "Ilość *"}>
+                  <input className={inputCls} type="number" min="1" max="20" value={fields.quantity} onChange={(e) => { setField("quantity", e.target.value); clearEstimate(); }} />
                 </Field>
 
                 {svc && svc.sizes && (
@@ -206,6 +402,7 @@ export default function OrderForm({ mode = "kontenery" }) {
                             setSelectedSize(s.key);
                             setSelectedWaste(null);
                             setErrors((e) => ({ ...e, size: false }));
+                            clearEstimate();
                           }}
                         />
                       ))}
@@ -228,6 +425,7 @@ export default function OrderForm({ mode = "kontenery" }) {
                             onClick={() => {
                               setSelectedWaste(w.key);
                               setErrors((e) => ({ ...e, waste: false }));
+                              clearEstimate();
                             }}
                           />
                         ))
@@ -239,20 +437,124 @@ export default function OrderForm({ mode = "kontenery" }) {
                 )}
 
                 <hr className={dividerCls} />
+                <div className={sectionLabelCls}>Dane kontaktowe</div>
+
+                <Field label="Imię i nazwisko *" error={errors.name}>
+                  <input className={inputCls} placeholder="Jan Kowalski" value={fields.name} onChange={(e) => setField("name", e.target.value)} />
+                </Field>
+                <Field label="Telefon *" error={errors.phone}>
+                  <input className={inputCls} placeholder="+48 500 000 000" value={fields.phone} onChange={(e) => setField("phone", e.target.value)} />
+                </Field>
+                <Field label="E-mail">
+                  <input className={inputCls} type="email" placeholder="jan@firma.pl" value={fields.email} onChange={(e) => setField("email", e.target.value)} />
+                </Field>
+                <Field label="Firma (opcjonalnie)">
+                  <input className={inputCls} placeholder="Nazwa firmy / NIP" value={fields.company} onChange={(e) => setField("company", e.target.value)} />
+                </Field>
+
+                <hr className={dividerCls} />
                 <div className={sectionLabelCls}>Szczegóły dostawy</div>
 
-                <Field label="Adres dostawy *" error={errors.address}>
-                  <input className={inputCls} placeholder="ul. Budowlana 12" value={fields.address} onChange={(e) => setField("address", e.target.value)} />
-                </Field>
-                <Field label="Miasto *" error={errors.city}>
-                  <input className={inputCls} placeholder="Białystok" value={fields.city} onChange={(e) => setField("city", e.target.value)} />
-                </Field>
+                <label className="col-span-full flex cursor-pointer items-center gap-2.5 text-[13px] text-[#f0ede8]">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-[#f5c842]"
+                    checked={useCoords}
+                    onChange={(e) => {
+                      setUseCoords(e.target.checked);
+                      clearEstimate();
+                      setErrors((er) => ({ ...er, address: false, postcode: false, city: false, coords: false }));
+                    }}
+                  />
+                  Nie mam adresu — podam współrzędne / link do map
+                </label>
+
+                {!useCoords ? (
+                  <>
+                    <Field label="Adres dostawy *" error={errors.address}>
+                      <input className={inputCls} placeholder="ul. Budowlana 12" value={fields.address} onChange={(e) => { setField("address", e.target.value); clearEstimate(); }} />
+                    </Field>
+                    <Field label="Kod pocztowy *" error={errors.postcode}>
+                      <input className={inputCls} placeholder="15-000" value={fields.postcode} onChange={(e) => { setField("postcode", e.target.value); clearEstimate(); }} />
+                    </Field>
+                    <Field label="Miasto *" error={errors.city}>
+                      <input className={inputCls} placeholder="Białystok" value={fields.city} onChange={(e) => { setField("city", e.target.value); clearEstimate(); }} />
+                    </Field>
+                  </>
+                ) : (
+                  <Field label="Współrzędne (lat, lon) lub link do map *" error={errors.coords}>
+                    <input
+                      className={inputCls}
+                      placeholder="53.415, 23.015"
+                      value={coordsInput}
+                      onChange={(e) => { setCoordsInput(e.target.value); clearEstimate(); setErrors((er) => ({ ...er, coords: false })); }}
+                    />
+                  </Field>
+                )}
                 <Field label="Preferowana data dostawy *" error={errors.date}>
                   <input className={inputCls} type="date" min={today} value={fields.date} onChange={(e) => setField("date", e.target.value)} />
                 </Field>
-                <Field label={svc ? svc.quantityLabel : "Ilość *"}>
-                  <input className={inputCls} type="number" min="1" max="20" value={fields.quantity} onChange={(e) => setField("quantity", e.target.value)} />
-                </Field>
+
+                {needsPrice && (
+                  <div className="col-span-full flex flex-col gap-3 rounded-xl border border-[#2a2b30] bg-[#0f1012] p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className={labelCls}>{isToilet ? "Koszt / dostępność dojazdu" : "Szacowany koszt (usługa + dojazd)"}</div>
+                        <p className="mt-1 text-[12px] italic text-[#7a7a82]">
+                          {isToilet
+                            ? "Do 100 km cena z cennika. Powyżej 100 km — wycena indywidualna."
+                            : "Wyliczany na podstawie adresu dostawy i wybranej usługi."}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={calcPrice}
+                        disabled={priceLoading}
+                        className="rounded-full border border-gold px-6 py-3 font-display text-[14px] font-bold uppercase tracking-[-0.2px] text-gold transition-all hover:bg-gold hover:text-[#0f1012] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {priceLoading ? "Liczenie…" : isToilet ? "Sprawdź koszt" : "Oblicz koszt dostawy"}
+                      </button>
+                    </div>
+                    {estimatedPrice !== null && (
+                      <div className="font-display text-[24px] font-extrabold text-gold">
+                        {isToilet ? estimatedPrice : `~ ${estimatedPrice}`} zł{" "}
+                        <span className="text-[13px] font-normal text-[#7a7a82]">
+                          {isToilet ? "brutto (dojazd w cenie do 100 km)" : "brutto (szacunkowo)"}
+                        </span>
+                      </div>
+                    )}
+                    {individualQuote && (
+                      <div className="text-[15px] font-light text-[#f0ede8]">
+                        Adres powyżej 100 km od bazy — <span className="font-semibold text-gold">wycena indywidualna</span>. Wyślij zamówienie, oddzwonimy z ceną.
+                      </div>
+                    )}
+                    {priceError && <p className="text-[13px] text-[#f04a4a]">{priceError}</p>}
+                  </div>
+                )}
+
+                {needsPrice && (
+                  <div className="col-span-full">
+                    <div className={sectionLabelCls}>Forma płatności *</div>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {PAYMENT_METHODS.map((p) => (
+                        <button
+                          type="button"
+                          key={p.key}
+                          onClick={() => { setPaymentMethod(p.key); setErrors((er) => ({ ...er, platnosc: false })); }}
+                          className={`flex-1 min-w-[130px] rounded-xl border px-5 py-3.5 text-left font-display text-[14px] font-bold uppercase tracking-[0.3px] transition-all ${
+                            errors.platnosc
+                              ? "border-[#f04a4a]"
+                              : paymentMethod === p.key
+                              ? "border-gold bg-[rgba(245,200,66,0.06)] text-gold"
+                              : "border-[#2a2b30] text-[#7a7a82] hover:border-gold-dark"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="col-span-full flex flex-col gap-2">
                   <label className={labelCls}>Dodatkowe informacje</label>
@@ -265,13 +567,17 @@ export default function OrderForm({ mode = "kontenery" }) {
                 </div>
               </div>
 
+              {submitError && (
+                <p className="mt-5 text-[14px] text-[#f04a4a]">{submitError}</p>
+              )}
               <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-[13px] font-light text-[#7a7a82]">🔒 Dane chronione, bez spamu</div>
                 <button
                   onClick={submit}
-                  className="rounded-full bg-gold px-9 py-[15px] font-display text-[16px] font-bold uppercase tracking-[-0.3px] text-[#0f1012] transition-all duration-200 hover:scale-[1.04] hover:brightness-110 active:scale-[0.97]"
+                  disabled={submitting}
+                  className="rounded-full bg-gold px-9 py-[15px] font-display text-[16px] font-bold uppercase tracking-[-0.3px] text-[#0f1012] transition-all duration-200 hover:scale-[1.04] hover:brightness-110 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
                 >
-                  Wyślij zamówienie →
+                  {submitting ? "Wysyłanie…" : "Wyślij zamówienie →"}
                 </button>
               </div>
             </div>
@@ -287,9 +593,14 @@ export default function OrderForm({ mode = "kontenery" }) {
               ✓
             </div>
             <h2 className="mb-3 font-display text-[36px] font-extrabold tracking-[-1px] text-gold">Zamówienie wysłane!</h2>
-            <p className="mx-auto mb-8 max-w-[400px] text-[16px] font-light text-[#7a7a82]">
+            <p className="mx-auto mb-4 max-w-[400px] text-[16px] font-light text-[#7a7a82]">
               Dziękujemy. Nasz konsultant skontaktuje się z Tobą telefonicznie w ciągu 2 godzin w dni robocze.
             </p>
+            {orderNumber && (
+              <p className="mx-auto mb-8 text-[15px] text-[#7a7a82]">
+                Numer zlecenia: <span className="font-display text-[18px] font-bold text-gold">{orderNumber}</span>
+              </p>
+            )}
             <button
               onClick={reset}
               className="rounded-full border border-[#2a2b30] px-7 py-3.5 font-display text-[15px] font-bold uppercase text-[#f0ede8] transition-all hover:border-gold hover:text-gold"

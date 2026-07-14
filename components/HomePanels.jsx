@@ -35,7 +35,16 @@ function Panel({ eyebrowless, title1, title2, chips, features, desc, href, img, 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: index * 0.12 }}
     >
-      <span className="pointer-events-none absolute left-0 top-0 h-0 w-0 border-[80px] border-b-0 border-r-0 border-solid border-white/[0.03] border-l-transparent" />
+      <span
+        className="pointer-events-none absolute left-0 top-0"
+        style={{
+          width: 0,
+          height: 0,
+          borderStyle: "solid",
+          borderWidth: "80px 80px 0 0",
+          borderColor: "rgba(255,255,255,0.03) transparent transparent transparent",
+        }}
+      />
 
       <div className="relative z-[2] flex max-w-[380px] flex-col">
         <h2 className="mb-7 font-display font-black uppercase leading-[0.88] tracking-[-1px]">
