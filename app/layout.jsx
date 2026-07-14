@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Barlow, Barlow_Condensed } from "next/font/google";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const barlow = Barlow({
   subsets: ["latin", "latin-ext"],
@@ -53,7 +54,10 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="pl" className={`${barlow.variable} ${barlowCondensed.variable}`}>
-      <body className="font-sans antialiased bg-ink-black text-white">{children}</body>
+      <body className="font-sans antialiased bg-ink-black text-white">
+        {children}
+        <ServiceWorkerRegister />
+      </body>
     </html>
   );
 }
