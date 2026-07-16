@@ -114,6 +114,42 @@ const TOILET_FREE_RADIUS_KM = 100;
 const TABLE_BY_MODE = { kontenery: "Zamówienia", toalety: "ToaletyZamowienia" };
 const PREFIX_BY_MODE = { kontenery: "BIAL", toalety: "TOA" };
 
+// Pakiety (kontener + toaleta). Cena bazowa stała, dojazd doliczany jak przy kontenerze.
+const PACKAGES = [
+  {
+    key: "pkgRemont",
+    label: "Pakiet Remont Gruz",
+    base: 999,
+    save: 438,
+    items: ["Kontener 5m³", "Toaleta przenośna na 3 miesiące (2 serwisy/mies.)"],
+  },
+  {
+    key: "pkgStandard",
+    label: "Pakiet Budowa Standard",
+    base: 1890,
+    save: 696,
+    items: ["Kontener 5m³", "Toaleta przenośna na 4 miesiące (2 serwisy/mies.)"],
+  },
+  {
+    key: "pkgMax",
+    label: "Pakiet Budowa Max",
+    base: 2790,
+    save: 1115,
+    items: [
+      "Kontener 7m³",
+      "Toaleta przenośna na 5 miesięcy (4 serwisy/mies.)",
+      "GRATIS: Big Bag 1m³ na czysty gruz",
+    ],
+  },
+];
+
+const PACKAGE_SERVICES = Object.fromEntries(
+  PACKAGES.map((p) => [
+    p.key,
+    { title: `Zamów ${p.label}`, label: p.label, quantityLabel: "Ilość pakietów *", sizes: null, noWaste: true, base: p.base, isPackage: true },
+  ])
+);
+
 const SERVICE_LISTS = {
   kontenery: [
     { key: "bigbag", label: "Big-Bag 1m³", sub: "od 299 zł brutto" },
@@ -161,7 +197,7 @@ const dividerCls = "col-span-full my-1 border-t border-[#2a2b30]";
 
 export default function OrderForm({ mode = "kontenery" }) {
   const serviceList = SERVICE_LISTS[mode] || SERVICE_LISTS.kontenery;
-  const services = mode === "toalety" ? TOILET_SERVICES : SERVICES;
+  const services = mode === "toalety" ? { ...TOILET_SERVICES, ...PACKAGE_SERVICES } : { ...SERVICES, ...PACKAGE_SERVICES };
 
   const [currentType, setCurrentType] = useState(null);
   const [selectedSize, setSelectedSize] = useState(null);
@@ -214,8 +250,9 @@ export default function OrderForm({ mode = "kontenery" }) {
     [availableAddons, addons]
   );
 
-  // Bazowa cena za sztukę: toalety = cena usługi + wyposażenie per szt., kontenery = cena wg rozmiaru + odpadu
+  // Bazowa cena za sztukę: toalety = cena usługi + wyposażenie, pakiet = cena pakietu, kontenery = wg rozmiaru + odpadu
   const basePrice = useMemo(() => {
+    if (svc?.isPackage) return svc.base;
     if (isToilet) return svc ? (svc.base ?? 0) + unitAddonsTotal : null;
     if (!wasteOptions || !selectedWaste) return null;
     return wasteOptions.find((w) => w.key === selectedWaste)?.base ?? null;
@@ -261,7 +298,10 @@ export default function OrderForm({ mode = "kontenery" }) {
       const distance = calculateDistance(DEPOT.lat, DEPOT.lon, coords.lat, coords.lon);
       const qty = Math.max(1, parseInt(fields.quantity, 10) || 1);
 
-      if (isToilet) {
+      if (svc?.isPackage) {
+        // pakiet: cena pakietu + dojazd
+        setEstimatedPrice(Math.round((basePrice + distance * TRANSPORT_RATE) * qty));
+      } else if (isToilet) {
         // do 100 km cena z listy, powyżej — wycena indywidualna
         if (distance > TOILET_FREE_RADIUS_KM) {
           setEstimatedPrice(null);
@@ -325,7 +365,7 @@ export default function OrderForm({ mode = "kontenery" }) {
     }
     if (svc && svc.sizes && !selectedSize) errs.size = true;
     if (svc && !svc.noWaste && !selectedWaste) errs.waste = true;
-    if (isToilet && currentType && !toiletType) errs.toiletType = true;
+    if (isToilet && currentType && !svc?.isPackage && !toiletType) errs.toiletType = true;
     if (needsPrice && !paymentMethod) errs.platnosc = true;
 
     setErrors(errs);
@@ -342,7 +382,7 @@ export default function OrderForm({ mode = "kontenery" }) {
     }
 
     // Etykiety zgodne z cennikiem / panelem admin
-    const serviceLabel = serviceList.find((s) => s.key === currentType)?.label || "";
+    const serviceLabel = svc?.isPackage ? svc.label : serviceList.find((s) => s.key === currentType)?.label || "";
     const sizeLabel = selectedSize ? svc.sizes?.find((s) => s.key === selectedSize)?.label : "";
     const typeLabel = isToilet ? TOILET_TYPES.find((t) => t.key === toiletType)?.label : null;
     const rodzajuslugi = svc?.sizes
@@ -456,6 +496,48 @@ export default function OrderForm({ mode = "kontenery" }) {
                     <OptCard key={s.key} item={s} selected={currentType === s.key} error={errors.service} onClick={() => pickService(s.key)} />
                   ))}
                 </div>
+
+                {(
+                  <>
+                    <div className={`${sectionLabelCls} flex items-center gap-2`}>
+                      Pakiety <span className="rounded bg-brand-yellow px-1.5 py-0.5 text-[9px] font-bold text-ink-black">Oszczędzasz</span>
+                    </div>
+                    <div className="col-span-full grid grid-cols-1 gap-3 md:grid-cols-3">
+                      {PACKAGES.map((p) => {
+                        const selected = currentType === p.key;
+                        return (
+                          <button
+                            type="button"
+                            key={p.key}
+                            onClick={() => pickService(p.key)}
+                            className={`relative flex flex-col overflow-hidden rounded-xl border p-5 text-left transition-all ${
+                              selected ? "border-gold bg-[rgba(245,200,66,0.06)] ring-1 ring-gold-dark" : "border-[#2a2b30] bg-[#0f1012] hover:border-gold-dark"
+                            }`}
+                          >
+                            <span className="absolute right-3 top-3 rounded bg-brand-yellow/15 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.5px] text-brand-yellow">
+                              −{p.save} zł
+                            </span>
+                            <span className={`font-display text-[16px] font-extrabold uppercase tracking-[0.5px] ${selected ? "text-gold" : "text-[#f0ede8]"}`}>
+                              {p.label}
+                            </span>
+                            <ul className="mt-3 flex flex-1 flex-col gap-1.5">
+                              {p.items.map((it) => (
+                                <li key={it} className="flex items-start gap-2 text-[12.5px] leading-snug text-[#a8a5a0]">
+                                  <span className="mt-[3px] text-brand-yellow">✓</span>
+                                  <span>{it}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <span className="mt-4 font-display text-[24px] font-extrabold text-gold">
+                              {p.base} zł <span className="text-[12px] font-normal text-[#7a7a82]">brutto</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
                 <Field label={svc ? svc.quantityLabel : "Ilość *"}>
                   <input className={inputCls} type="number" min="1" max="20" value={fields.quantity} onChange={(e) => { setField("quantity", e.target.value); clearEstimate(); }} />
                 </Field>
@@ -509,7 +591,7 @@ export default function OrderForm({ mode = "kontenery" }) {
                   </>
                 )}
 
-                {isToilet && svc && (
+                {isToilet && svc && !svc.isPackage && (
                   <>
                     <hr className={dividerCls} />
                     <div className={sectionLabelCls}>Typ toalety *</div>
