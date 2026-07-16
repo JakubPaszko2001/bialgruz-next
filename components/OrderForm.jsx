@@ -70,17 +70,17 @@ const PAYMENT_METHODS = [
   { key: "przelew", label: "Przelew" },
 ];
 
-// Kolejny numer zlecenia BIALxxxx (jak w Order.jsx)
-async function generateOrderNumber(table) {
+// Kolejny numer zlecenia: kontenery = BIALxxxx, toalety = TOAxxxx
+async function generateOrderNumber(table, prefix) {
   const { data, error } = await supabase
     .from(table)
     .select("numerZlecenia, id")
     .order("id", { ascending: false })
     .limit(1);
-  if (error || !data?.length || !data[0]?.numerZlecenia) return "BIAL0001";
-  const match = data[0].numerZlecenia.match(/BIAL(\d+)/);
+  if (error || !data?.length || !data[0]?.numerZlecenia) return `${prefix}0001`;
+  const match = data[0].numerZlecenia.match(new RegExp(`${prefix}(\\d+)`));
   const next = match ? parseInt(match[1], 10) + 1 : 1;
-  return `BIAL${next.toString().padStart(4, "0")}`;
+  return `${prefix}${next.toString().padStart(4, "0")}`;
 }
 
 const TOILET_SERVICES = {
@@ -95,6 +95,7 @@ const TOILET_FREE_RADIUS_KM = 100;
 
 // Tabele Supabase per tryb
 const TABLE_BY_MODE = { kontenery: "Zamówienia", toalety: "ToaletyZamowienia" };
+const PREFIX_BY_MODE = { kontenery: "BIAL", toalety: "TOA" };
 
 const SERVICE_LISTS = {
   kontenery: [
@@ -313,10 +314,11 @@ export default function OrderForm({ mode = "kontenery" }) {
     };
 
     const table = TABLE_BY_MODE[mode] || TABLE_BY_MODE.kontenery;
+    const prefix = PREFIX_BY_MODE[mode] || PREFIX_BY_MODE.kontenery;
     setSubmitting(true);
     setSubmitError("");
     try {
-      const numerZlecenia = await generateOrderNumber(table);
+      const numerZlecenia = await generateOrderNumber(table, prefix);
       const { error } = await supabase.from(table).insert([{ ...payload, numerZlecenia }]);
       if (error) throw error;
       setOrderNumber(numerZlecenia);

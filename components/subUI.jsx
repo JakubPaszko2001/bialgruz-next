@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Reveal from "@/components/Reveal";
 import OrderForm from "@/components/OrderForm";
+import HeroSwitch from "@/components/HeroSwitch";
 
 /* ── Small helpers ── */
 export function Eyebrow({ children, className = "" }) {
@@ -26,7 +27,7 @@ const check = (
 );
 
 /* ── HERO ── */
-export function Hero({ titleTop, titleBottom, desc, badges, primary, secondary, phone, image, stats = [] }) {
+export function Hero({ titleTop, titleBottom, desc, badges, primary, secondary, phone, image, stats = [], activePage }) {
   return (
     <section className="relative flex min-h-screen items-center overflow-hidden bg-diagonal pt-[72px]">
       <div className="relative z-[1] mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-12 px-6 py-16 sm:px-[60px] md:grid-cols-2">
@@ -90,6 +91,7 @@ export function Hero({ titleTop, titleBottom, desc, badges, primary, secondary, 
           </div>
         </Reveal>
       </div>
+      {activePage && <HeroSwitch active={activePage} />}
     </section>
   );
 }

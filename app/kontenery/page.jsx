@@ -2,6 +2,7 @@ import PageNav from "@/components/PageNav";
 import Footer from "@/components/Footer";
 import { Hero, Strip, WhySection, StepsSection, Contact } from "@/components/subUI";
 import OfferKontenery from "@/components/OfferKontenery";
+import OfferTransition from "@/components/OfferTransition";
 
 export const metadata = {
   title: "Kontenery i Big Bagi na odpady budowlane – BIALGRUZ",
@@ -27,7 +28,9 @@ export default function KonteneryPage() {
   return (
     <>
       <PageNav />
+      <OfferTransition from="left">
       <Hero
+        activePage="kontenery"
         titleTop="Kontenery i"
         titleBottom="Big Bagi"
         desc="Wynajem kontenerów i big bagów na gruz oraz odpady budowlane — na każdą budowę, remont i inwestycję. Szybkie podstawienie, wywóz i legalna utylizacja w całym regionie."
@@ -78,6 +81,7 @@ export default function KonteneryPage() {
 
       <Contact mode="kontenery" />
       <Footer copy="© 2025 BIALGRUZ. Wynajem kontenerów i big bagów na odpady budowlane." />
+      </OfferTransition>
     </>
   );
 }

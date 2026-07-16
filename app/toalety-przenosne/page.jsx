@@ -2,6 +2,7 @@ import PageNav from "@/components/PageNav";
 import Footer from "@/components/Footer";
 import { Hero, WhySection, StepsSection, Contact } from "@/components/subUI";
 import OfferToilets from "@/components/OfferToilets";
+import OfferTransition from "@/components/OfferTransition";
 
 export const metadata = {
   title: "Toalety przenośne – BIALGRUZ",
@@ -24,7 +25,9 @@ export default function ToaletyPage() {
   return (
     <>
       <PageNav />
+      <OfferTransition from="right">
       <Hero
+        activePage="toalety"
         titleTop="Toalety"
         titleBottom="Przenośne"
         desc="Nowoczesne toalety przenośne na każdą budowę, imprezę i inwestycję. Kompleksowa obsługa, terminowość i pełne zaplecze sanitarne w całym regionie."
@@ -73,6 +76,7 @@ export default function ToaletyPage() {
 
       <Contact mode="toalety" />
       <Footer copy="© 2025 BIALGRUZ. Wynajem toalet przenośnych." />
+      </OfferTransition>
     </>
   );
 }
