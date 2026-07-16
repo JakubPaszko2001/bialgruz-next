@@ -62,7 +62,7 @@ export default function ToaletyPage() {
           { title: "Ekologiczne środki", text: "Używamy certyfikowanych biologicznych środków rozkładających odpady, bezpiecznych dla środowiska." },
           { title: "Pełna obsługa", text: "Dostawa, montaż, serwis i odbiór — wszystko w jednej cenie. Nie musisz się o nic martwić." },
         ]}
-        image={{ src: "/toaleta-bialgruz.png", alt: "Toaleta BIALGRUZ" }}
+        image={{ src: "/toaleta-bialgruz.png", hoverSrc: "/kibel-otwarty.png", alt: "Toaleta BIALGRUZ" }}
       />
 
       <StepsSection

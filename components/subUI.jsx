@@ -137,15 +137,28 @@ export function WhySection({ title, features, image }) {
               </Reveal>
             ))}
           </div>
-          <Reveal delay={0.2} className="relative">
+          <Reveal delay={0.2} className="group relative">
             <div className="absolute inset-[-40px] bg-[radial-gradient(ellipse,rgba(207,220,0,0.06)_0%,transparent_70%)]" />
-            <Image
-              src={image.src}
-              alt={image.alt}
-              width={400}
-              height={520}
-              className="relative mx-auto block w-full max-w-[400px] object-contain drop-shadow-[0_30px_80px_rgba(0,0,0,0.5)]"
-            />
+            <div className="relative mx-auto w-full max-w-[400px]">
+              <Image
+                src={image.src}
+                alt={image.alt}
+                width={400}
+                height={520}
+                className={`relative block w-full object-contain drop-shadow-[0_30px_80px_rgba(0,0,0,0.5)] transition-opacity duration-300 ${
+                  image.hoverSrc ? "group-hover:opacity-0" : ""
+                }`}
+              />
+              {image.hoverSrc && (
+                <Image
+                  src={image.hoverSrc}
+                  alt={image.alt}
+                  width={400}
+                  height={520}
+                  className="absolute inset-0 block w-full object-contain opacity-0 drop-shadow-[0_30px_80px_rgba(0,0,0,0.5)] transition-opacity duration-300 group-hover:opacity-100"
+                />
+              )}
+            </div>
           </Reveal>
         </div>
       </div>
