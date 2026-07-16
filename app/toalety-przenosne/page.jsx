@@ -3,6 +3,7 @@ import Footer from "@/components/Footer";
 import { Hero, WhySection, StepsSection, Contact } from "@/components/subUI";
 import OfferToilets from "@/components/OfferToilets";
 import OfferTransition from "@/components/OfferTransition";
+import Locations from "@/components/Locations";
 
 export const metadata = {
   title: "Toalety przenośne – BIALGRUZ",
@@ -75,6 +76,7 @@ export default function ToaletyPage() {
       />
 
       <Contact mode="toalety" />
+      <Locations />
       <Footer copy="© 2025 BIALGRUZ. Wynajem toalet przenośnych." />
       </OfferTransition>
     </>

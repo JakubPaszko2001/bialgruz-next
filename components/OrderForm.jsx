@@ -90,6 +90,23 @@ const TOILET_SERVICES = {
   t1m4s: { title: "Zamów toaletę — 1 miesiąc", quantityLabel: "Ilość toalet *", sizes: null, noWaste: true, base: 479 },
 };
 
+// Typ toalety
+const TOILET_TYPES = [
+  { key: "std", label: "Standardowa", sub: "Klasyczna kabina" },
+  { key: "umywalka", label: "Z umywalką", sub: "Z umywalką i zbiornikiem na wodę" },
+];
+
+// Wyposażenie dodatkowe (ceny brutto). perOrder = dopłata raz za zamówienie, reszta per toaleta.
+const TOILET_ADDONS_BASE = [
+  { key: "kosz", label: "Kosz na śmieci", price: 30 },
+  { key: "swiatlo", label: "Oświetlenie wewnątrz", price: 49 },
+  { key: "express", label: "Dostawa Express (w ciągu 12h)", price: 200, perOrder: true },
+];
+const TOILET_ADDONS_UMYWALKA = [
+  { key: "mydlo", label: "Dozownik z mydłem", price: 49 },
+  { key: "reczniki", label: "Podajnik z ręcznikami papierowymi", price: 59 },
+];
+
 // Limit dojazdu dla toalet: do 100 km cena z listy, powyżej — wycena indywidualna
 const TOILET_FREE_RADIUS_KM = 100;
 
@@ -161,6 +178,8 @@ export default function OrderForm({ mode = "kontenery" }) {
   const [coordsInput, setCoordsInput] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [individualQuote, setIndividualQuote] = useState(false);
+  const [toiletType, setToiletType] = useState(null);
+  const [addons, setAddons] = useState({}); // { kosz: true, ... }
   const [fields, setFields] = useState({
     name: "", phone: "", email: "", company: "", address: "", postcode: "", city: "", date: "", quantity: "1", notes: "",
   });
@@ -176,12 +195,31 @@ export default function OrderForm({ mode = "kontenery" }) {
     return svc.waste;
   }, [svc, selectedSize]);
 
-  // Bazowa cena: toalety = cena usługi, kontenery = cena wg rozmiaru + odpadu
+  // Dostępne wyposażenie dodatkowe (mydło/ręczniki tylko dla toalety z umywalką)
+  const availableAddons = useMemo(() => {
+    if (!isToilet) return [];
+    return toiletType === "umywalka"
+      ? [...TOILET_ADDONS_UMYWALKA, ...TOILET_ADDONS_BASE]
+      : TOILET_ADDONS_BASE;
+  }, [isToilet, toiletType]);
+
+  // Dopłaty per toaleta (mnożone przez ilość)
+  const unitAddonsTotal = useMemo(
+    () => availableAddons.reduce((sum, a) => (addons[a.key] && !a.perOrder ? sum + a.price : sum), 0),
+    [availableAddons, addons]
+  );
+  // Dopłaty per zamówienie (np. Dostawa Express — raz)
+  const orderAddonsTotal = useMemo(
+    () => availableAddons.reduce((sum, a) => (addons[a.key] && a.perOrder ? sum + a.price : sum), 0),
+    [availableAddons, addons]
+  );
+
+  // Bazowa cena za sztukę: toalety = cena usługi + wyposażenie per szt., kontenery = cena wg rozmiaru + odpadu
   const basePrice = useMemo(() => {
-    if (isToilet) return svc?.base ?? null;
+    if (isToilet) return svc ? (svc.base ?? 0) + unitAddonsTotal : null;
     if (!wasteOptions || !selectedWaste) return null;
     return wasteOptions.find((w) => w.key === selectedWaste)?.base ?? null;
-  }, [isToilet, svc, wasteOptions, selectedWaste]);
+  }, [isToilet, svc, unitAddonsTotal, wasteOptions, selectedWaste]);
 
   // Reset wyceny po każdej zmianie wpływającej na cenę
   function clearEstimate() {
@@ -229,7 +267,7 @@ export default function OrderForm({ mode = "kontenery" }) {
           setEstimatedPrice(null);
           setIndividualQuote(true);
         } else {
-          setEstimatedPrice(basePrice * qty);
+          setEstimatedPrice(basePrice * qty + orderAddonsTotal);
         }
       } else {
         setEstimatedPrice(Math.round((basePrice + distance * TRANSPORT_RATE) * qty));
@@ -254,6 +292,24 @@ export default function OrderForm({ mode = "kontenery" }) {
     clearEstimate();
   }
 
+  function pickToiletType(key) {
+    setToiletType(key);
+    // Bez umywalki: usuń dopłaty za mydło/ręczniki
+    if (key !== "umywalka") {
+      setAddons((a) => {
+        const { mydlo, reczniki, ...rest } = a;
+        return rest;
+      });
+    }
+    setErrors((e) => ({ ...e, toiletType: false }));
+    clearEstimate();
+  }
+
+  function toggleAddon(key) {
+    setAddons((a) => ({ ...a, [key]: !a[key] }));
+    clearEstimate();
+  }
+
   async function submit() {
     const errs = {};
     if (!currentType) errs.service = true;
@@ -269,6 +325,7 @@ export default function OrderForm({ mode = "kontenery" }) {
     }
     if (svc && svc.sizes && !selectedSize) errs.size = true;
     if (svc && !svc.noWaste && !selectedWaste) errs.waste = true;
+    if (isToilet && currentType && !toiletType) errs.toiletType = true;
     if (needsPrice && !paymentMethod) errs.platnosc = true;
 
     setErrors(errs);
@@ -287,11 +344,23 @@ export default function OrderForm({ mode = "kontenery" }) {
     // Etykiety zgodne z cennikiem / panelem admin
     const serviceLabel = serviceList.find((s) => s.key === currentType)?.label || "";
     const sizeLabel = selectedSize ? svc.sizes?.find((s) => s.key === selectedSize)?.label : "";
-    const rodzajuslugi = svc?.sizes ? `${serviceLabel} ${sizeLabel}`.trim() : serviceLabel;
+    const typeLabel = isToilet ? TOILET_TYPES.find((t) => t.key === toiletType)?.label : null;
+    const rodzajuslugi = svc?.sizes
+      ? `${serviceLabel} ${sizeLabel}`.trim()
+      : isToilet && typeLabel
+      ? `${serviceLabel} · ${typeLabel}`
+      : serviceLabel;
     const rodzajodpadu = wasteOptions?.find((w) => w.key === selectedWaste)?.label || null;
 
+    const selectedAddonLabels = availableAddons.filter((a) => addons[a.key]).map((a) => a.label);
     const [firstName, ...rest] = fields.name.trim().split(/\s+/);
-    const message = [fields.notes.trim(), `Ilość: ${fields.quantity}`].filter(Boolean).join(" | ");
+    const message = [
+      fields.notes.trim(),
+      isToilet && selectedAddonLabels.length ? `Wyposażenie: ${selectedAddonLabels.join(", ")}` : "",
+      `Ilość: ${fields.quantity}`,
+    ]
+      .filter(Boolean)
+      .join(" | ");
     const coords = useCoords ? parseCoordinates(coordsInput) : null;
 
     const payload = {
@@ -347,6 +416,8 @@ export default function OrderForm({ mode = "kontenery" }) {
     setCoordsInput("");
     setPaymentMethod("");
     setIndividualQuote(false);
+    setToiletType(null);
+    setAddons({});
     clearEstimate();
   }
 
@@ -435,6 +506,58 @@ export default function OrderForm({ mode = "kontenery" }) {
                         <div className="text-[13px] italic text-[#7a7a82]">← Najpierw wybierz rozmiar</div>
                       )}
                     </div>
+                  </>
+                )}
+
+                {isToilet && svc && (
+                  <>
+                    <hr className={dividerCls} />
+                    <div className={sectionLabelCls}>Typ toalety *</div>
+                    <div className="col-span-full flex flex-wrap gap-3">
+                      {TOILET_TYPES.map((t) => (
+                        <OptCard
+                          key={t.key}
+                          item={t}
+                          selected={toiletType === t.key}
+                          error={errors.toiletType}
+                          onClick={() => pickToiletType(t.key)}
+                        />
+                      ))}
+                    </div>
+
+                    {toiletType && (
+                      <>
+                        <hr className={dividerCls} />
+                        <div className={sectionLabelCls}>Wyposażenie dodatkowe</div>
+                        <div className="col-span-full grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {availableAddons.map((a) => {
+                            const checked = !!addons[a.key];
+                            return (
+                              <button
+                                type="button"
+                                key={a.key}
+                                onClick={() => toggleAddon(a.key)}
+                                className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3.5 text-left transition-all ${
+                                  checked ? "border-gold bg-[rgba(245,200,66,0.06)]" : "border-[#2a2b30] hover:border-gold-dark"
+                                }`}
+                              >
+                                <span className="flex items-center gap-3">
+                                  <span
+                                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] ${
+                                      checked ? "border-gold bg-gold font-bold text-[#0f1012]" : "border-[#2a2b30]"
+                                    }`}
+                                  >
+                                    {checked ? "✓" : ""}
+                                  </span>
+                                  <span className="text-[14px] text-[#f0ede8]">{a.label}</span>
+                                </span>
+                                <span className="shrink-0 font-display text-[14px] font-bold text-gold">+{a.price} zł</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
 

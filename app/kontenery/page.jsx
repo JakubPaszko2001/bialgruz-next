@@ -3,6 +3,7 @@ import Footer from "@/components/Footer";
 import { Hero, Strip, WhySection, StepsSection, Contact } from "@/components/subUI";
 import OfferKontenery from "@/components/OfferKontenery";
 import OfferTransition from "@/components/OfferTransition";
+import Locations from "@/components/Locations";
 
 export const metadata = {
   title: "Kontenery i Big Bagi na odpady budowlane – BIALGRUZ",
@@ -80,6 +81,7 @@ export default function KonteneryPage() {
       />
 
       <Contact mode="kontenery" />
+      <Locations />
       <Footer copy="© 2025 BIALGRUZ. Wynajem kontenerów i big bagów na odpady budowlane." />
       </OfferTransition>
     </>
