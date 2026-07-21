@@ -4,6 +4,7 @@ import { Hero, Strip, WhySection, StepsSection, Contact } from "@/components/sub
 import OfferKontenery from "@/components/OfferKontenery";
 import OfferTransition from "@/components/OfferTransition";
 import Locations from "@/components/Locations";
+import ContactInfo from "@/components/ContactInfo";
 
 export const metadata = {
   title: "Kontenery i Big Bagi na odpady budowlane – BIALGRUZ",
@@ -30,59 +31,60 @@ export default function KonteneryPage() {
     <>
       <PageNav />
       <OfferTransition from="left">
-      <Hero
-        activePage="kontenery"
-        titleTop="Kontenery i"
-        titleBottom="Big Bagi"
-        desc="Wynajem kontenerów i big bagów na gruz oraz odpady budowlane — na każdą budowę, remont i inwestycję. Szybkie podstawienie, wywóz i legalna utylizacja w całym regionie."
-        badges={[
-          { icon: "✓", label: <>Szybkie<br />podstawienie</> },
-          { icon: "↺", label: <>Wywóz i<br />utylizacja</> },
-          { icon: "◉", label: <>Legalne<br />składowanie</> },
-        ]}
-        primary={{ label: "Wybierz kontener →", href: "#oferta" }}
-        secondary={{ label: "Jak to działa", href: "#jak" }}
-        phone={phoneBlock}
-        image={{ src: "/kontener-bialgruz.png", alt: "Kontener na gruz BIALGRUZ", w: 500, h: 520 }}
-        stats={[
-          { num: "1000+", label: "Wywiezionych kontenerów", pos: "a" },
-          { num: "24h", label: "Czas podstawienia", pos: "b" },
-        ]}
-      />
+        <Hero
+          activePage="kontenery"
+          titleTop="Kontenery i"
+          titleBottom="Big Bagi"
+          desc="Wynajem kontenerów i big bagów na gruz oraz odpady budowlane — na każdą budowę, remont i inwestycję. Szybkie podstawienie, wywóz i legalna utylizacja w całym regionie."
+          badges={[
+            { icon: "✓", label: <>Szybkie<br />podstawienie</> },
+            { icon: "↺", label: <>Wywóz i<br />utylizacja</> },
+            { icon: "◉", label: <>Legalne<br />składowanie</> },
+          ]}
+          primary={{ label: "Wybierz kontener →", href: "#oferta" }}
+          secondary={{ label: "Jak to działa", href: "#jak" }}
+          phone={phoneBlock}
+          image={{ src: "/kontener-bialgruz.png", alt: "Kontener na gruz BIALGRUZ", w: 500, h: 520 }}
+          stats={[
+            { num: "1000+", label: "Wywiezionych kontenerów", pos: "a" },
+            { num: "24h", label: "Czas podstawienia", pos: "b" },
+          ]}
+        />
 
-      <Strip items={["Gruz i Beton", "Odpady Budowlane", "Ziemia i Piasek", "Odpady Zmieszane", "Big Bagi"]} />
+        <Strip items={["Gruz i Beton", "Odpady Budowlane", "Ziemia i Piasek", "Odpady Zmieszane", "Big Bagi"]} />
 
-      <OfferKontenery />
+        <OfferKontenery />
 
-      <WhySection
-        title={
-          <>
-            Doświadczenie
-            <br />i <em className="not-italic text-brand-yellow">rzetelność</em>
-          </>
-        }
-        features={[
-          { title: "Szybkie podstawienie", text: "Podstawiamy kontener lub big bag w uzgodnionym terminie na terenie całego regionu — również w weekendy." },
-          { title: "Wywóz na czas", text: "Odbieramy pełny kontener w umówionym terminie i w razie potrzeby podstawiamy kolejny — bez przestojów na budowie." },
-          { title: "Legalna utylizacja", text: "Odpady trafiają do certyfikowanych punktów przetwarzania. Otrzymujesz komplet dokumentów odbioru odpadów." },
-          { title: "Pełna obsługa", text: "Podstawienie, wywóz i utylizacja — wszystko w jednej cenie. Nie musisz się o nic martwić." },
-        ]}
-        image={{ src: "/kontener-bialgruz.png", alt: "Kontener na gruz BIALGRUZ" }}
-      />
+        <WhySection
+          title={
+            <>
+              Doświadczenie
+              <br />i <em className="not-italic text-brand-yellow">rzetelność</em>
+            </>
+          }
+          features={[
+            { title: "Szybkie podstawienie", text: "Podstawiamy kontener lub big bag w uzgodnionym terminie na terenie całego regionu — również w weekendy." },
+            { title: "Wywóz na czas", text: "Odbieramy pełny kontener w umówionym terminie i w razie potrzeby podstawiamy kolejny — bez przestojów na budowie." },
+            { title: "Legalna utylizacja", text: "Odpady trafiają do certyfikowanych punktów przetwarzania. Otrzymujesz komplet dokumentów odbioru odpadów." },
+            { title: "Pełna obsługa", text: "Podstawienie, wywóz i utylizacja — wszystko w jednej cenie. Nie musisz się o nic martwić." },
+          ]}
+          image={{ src: "/kontener-bialgruz.png", alt: "Kontener na gruz BIALGRUZ" }}
+        />
 
-      <StepsSection
-        sub="Prosty proces online — od formularza do wywiezionego gruzu."
-        steps={[
-          { title: "Formularz online", text: "Wypełnij krótki formularz na stronie — wybierz rodzaj odpadu, pojemność i termin." },
-          { title: "Automatyczna wycena", text: "Cenę zobaczysz od razu na stronie — wyliczana automatycznie, bez czekania na kontakt." },
-          { title: "Podstawienie", text: "Podstawiamy kontener lub big bag we wskazanym miejscu w uzgodnionym terminie." },
-          { title: "Wywóz", text: "Odbieramy pełny kontener i przekazujemy odpady do legalnej utylizacji." },
-        ]}
-      />
+        <StepsSection
+          sub="Prosty proces online — od formularza do wywiezionego gruzu."
+          steps={[
+            { title: "Formularz online", text: "Wypełnij krótki formularz na stronie — wybierz rodzaj odpadu, pojemność i termin." },
+            { title: "Automatyczna wycena", text: "Cenę zobaczysz od razu na stronie — wyliczana automatycznie, bez czekania na kontakt." },
+            { title: "Podstawienie", text: "Podstawiamy kontener lub big bag we wskazanym miejscu w uzgodnionym terminie." },
+            { title: "Wywóz", text: "Odbieramy pełny kontener i przekazujemy odpady do legalnej utylizacji." },
+          ]}
+        />
 
-      <Contact mode="kontenery" />
-      <Locations />
-      <Footer copy="© 2025 BIALGRUZ. Wynajem kontenerów i big bagów na odpady budowlane." />
+        <Contact mode="kontenery" />
+        <Locations />
+        <ContactInfo />
+        <Footer copy="© 2025 BIALGRUZ. Wynajem kontenerów i big bagów na odpady budowlane." />
       </OfferTransition>
     </>
   );

@@ -11,7 +11,7 @@ const labelCls = "block text-[12px] font-medium uppercase tracking-[0.7px] text-
 
 const CONTAINER_FIELDS = [
   "name", "forname", "phone", "email", "nip",
-  "rodzajuslugi", "rodzajodpadu", "address", "postcode", "city",
+  "rodzajuslugi", "rodzajodpadu", "ilosc", "address", "postcode", "city",
   "koordynaty",
   "message", "platnosc", "szacowany", "dataDostawy",
   "numerKontenera", "numerZlecenia", "Status", "dataUtworzenia",
@@ -20,7 +20,7 @@ const CONTAINER_FIELDS = [
 // Toalety: bez rodzaju odpadu i numeru kontenera
 const TOILET_FIELDS = [
   "name", "forname", "phone", "email", "nip",
-  "rodzajuslugi", "address", "postcode", "city",
+  "rodzajuslugi", "ilosc", "address", "postcode", "city",
   "koordynaty",
   "message", "platnosc", "szacowany", "dataDostawy",
   "numerZlecenia", "Status", "dataUtworzenia",
@@ -30,7 +30,7 @@ export const ADMIN_FIELD_SETS = { container: CONTAINER_FIELDS, toilet: TOILET_FI
 
 const labelFor = (field) => ({
   name: "Imię", forname: "Nazwisko", phone: "Telefon", email: "E-mail", nip: "NIP",
-  rodzajuslugi: "Rodzaj usługi", rodzajodpadu: "Rodzaj odpadu", address: "Adres",
+  rodzajuslugi: "Rodzaj usługi", rodzajodpadu: "Rodzaj odpadu", ilosc: "Ilość", address: "Adres",
   postcode: "Kod pocztowy", city: "Miasto", koordynaty: "Koordynaty", message: "Wiadomość",
   platnosc: "Płatność", szacowany: "Szacowany koszt", dataDostawy: "Data dostawy",
   numerKontenera: "Numer kontenera", numerZlecenia: "Numer zlecenia", Status: "Status",
@@ -266,7 +266,12 @@ export default function AdminPanel({ onLogout, table = "Zamówienia", title = "P
             {sortedOrders.map((order) => (
               <tr key={order.id} className="border-b border-[#2a2b30]/60 transition-colors hover:bg-[rgba(245,200,66,0.03)]">
                 {allFields.map((field) => (
-                  <td key={field} className="whitespace-nowrap px-3 py-2.5 font-light text-[#d6d3ce]">
+                  <td
+                    key={field}
+                    className={`px-3 py-2.5 align-top font-light text-[#d6d3ce] ${
+                      field === "message" ? "min-w-[240px] max-w-[320px] whitespace-pre-line" : "whitespace-nowrap"
+                    }`}
+                  >
                     {fmtCell(order, field)}
                   </td>
                 ))}

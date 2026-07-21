@@ -3,6 +3,10 @@
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "./supabaseClient";
+import LegalModal from "./LegalModal";
+import Regulamin from "@/Components2/Regulamin";
+import RegulaminUslug from "@/Components2/RegulaminUslug";
+import Rodo from "./Rodo";
 
 /* ── Pricing data ── */
 const SERVICES = {
@@ -110,6 +114,7 @@ const TOILET_ADDONS_UMYWALKA = [
 // Limit dojazdu dla toalet: do 100 km cena z listy, powyżej — wycena indywidualna
 const TOILET_FREE_RADIUS_KM = 100;
 
+
 // Tabele Supabase per tryb
 const TABLE_BY_MODE = { kontenery: "Zamówienia", toalety: "ToaletyZamowienia" };
 const PREFIX_BY_MODE = { kontenery: "BIAL", toalety: "TOA" };
@@ -169,14 +174,12 @@ function OptCard({ item, selected, onClick, error }) {
     <button
       type="button"
       onClick={onClick}
-      className={`relative min-w-[140px] flex-1 select-none rounded-xl border bg-[#0f1012] p-4 px-5 text-left transition-all duration-200 ${
-        error ? "border-[#f04a4a]" : selected ? "border-gold ring-1 ring-gold-dark" : "border-[#2a2b30]"
-      } ${selected ? "-translate-y-0.5 bg-[rgba(245,200,66,0.06)]" : "hover:-translate-y-0.5 hover:border-gold-dark"}`}
+      className={`relative min-w-[140px] flex-1 select-none rounded-xl border bg-[#0f1012] p-4 px-5 text-left transition-all duration-200 ${error ? "border-[#f04a4a]" : selected ? "border-gold ring-1 ring-gold-dark" : "border-[#2a2b30]"
+        } ${selected ? "-translate-y-0.5 bg-[rgba(245,200,66,0.06)]" : "hover:-translate-y-0.5 hover:border-gold-dark"}`}
     >
       <span
-        className={`absolute right-2.5 top-2.5 grid h-5 w-5 place-items-center rounded-full border text-[10px] transition-all ${
-          selected ? "border-gold bg-gold font-bold text-[#0f1012]" : "border-[#2a2b30]"
-        }`}
+        className={`absolute right-2.5 top-2.5 grid h-5 w-5 place-items-center rounded-full border text-[10px] transition-all ${selected ? "border-gold bg-gold font-bold text-[#0f1012]" : "border-[#2a2b30]"
+          }`}
       >
         {selected ? "✓" : ""}
       </span>
@@ -216,6 +219,8 @@ export default function OrderForm({ mode = "kontenery" }) {
   const [individualQuote, setIndividualQuote] = useState(false);
   const [toiletType, setToiletType] = useState(null);
   const [addons, setAddons] = useState({}); // { kosz: true, ... }
+  const [consents, setConsents] = useState({ faktura: false, odpady: false, regulamin: false, odstapienie: false });
+  const [legalModal, setLegalModal] = useState(null); // "regulamin" | "uslug" | "rodo" | null
   const [fields, setFields] = useState({
     name: "", phone: "", email: "", company: "", address: "", postcode: "", city: "", date: "", quantity: "1", notes: "",
   });
@@ -367,6 +372,7 @@ export default function OrderForm({ mode = "kontenery" }) {
     if (svc && !svc.noWaste && !selectedWaste) errs.waste = true;
     if (isToilet && currentType && !svc?.isPackage && !toiletType) errs.toiletType = true;
     if (needsPrice && !paymentMethod) errs.platnosc = true;
+    if (!consents.faktura || !consents.odpady || !consents.regulamin || !consents.odstapienie) errs.consents = true;
 
     setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -388,19 +394,21 @@ export default function OrderForm({ mode = "kontenery" }) {
     const rodzajuslugi = svc?.sizes
       ? `${serviceLabel} ${sizeLabel}`.trim()
       : isToilet && typeLabel
-      ? `${serviceLabel} · ${typeLabel}`
-      : serviceLabel;
+        ? `${serviceLabel} · ${typeLabel}`
+        : serviceLabel;
     const rodzajodpadu = wasteOptions?.find((w) => w.key === selectedWaste)?.label || null;
 
     const selectedAddonLabels = availableAddons.filter((a) => addons[a.key]).map((a) => a.label);
     const [firstName, ...rest] = fields.name.trim().split(/\s+/);
+    const ilosc = Math.max(1, parseInt(fields.quantity, 10) || 1);
     const message = [
-      fields.notes.trim(),
-      isToilet && selectedAddonLabels.length ? `Wyposażenie: ${selectedAddonLabels.join(", ")}` : "",
-      `Ilość: ${fields.quantity}`,
+      fields.notes.trim() ? "Wiadomość:\n" + fields.notes.trim() : "",
+      isToilet && selectedAddonLabels.length
+        ? "Wyposażenie:\n" + selectedAddonLabels.map((l) => `• ${l}`).join("\n")
+        : "",
     ]
       .filter(Boolean)
-      .join(" | ");
+      .join("\n");
     const coords = useCoords ? parseCoordinates(coordsInput) : null;
 
     const payload = {
@@ -415,6 +423,7 @@ export default function OrderForm({ mode = "kontenery" }) {
       postcode: useCoords ? "" : fields.postcode.trim(),
       city: useCoords ? "" : fields.city.trim(),
       koordynaty: coords ? `${coords.lat}, ${coords.lon}` : null,
+      ilosc,
       message,
       platnosc: paymentMethod || null,
       szacowany: individualQuote ? "Wycena indywidualna" : estimatedPrice != null ? estimatedPrice.toString() : null,
@@ -458,6 +467,7 @@ export default function OrderForm({ mode = "kontenery" }) {
     setIndividualQuote(false);
     setToiletType(null);
     setAddons({});
+    setConsents({ faktura: false, odpady: false, regulamin: false, odstapienie: false });
     clearEstimate();
   }
 
@@ -490,57 +500,53 @@ export default function OrderForm({ mode = "kontenery" }) {
 
             <div className="rounded-2xl border border-[#2a2b30] bg-[#18191d] p-6 sm:p-10">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div className={`${sectionLabelCls} flex items-center gap-2`}>
+                  Pakiety <span className="rounded bg-brand-yellow px-1.5 py-0.5 text-[9px] font-bold text-ink-black">Oszczędzasz</span>
+                </div>
+                <div className="col-span-full grid grid-cols-1 gap-3 md:grid-cols-3">
+                  {PACKAGES.map((p) => {
+                    const selected = currentType === p.key;
+                    return (
+                      <button
+                        type="button"
+                        key={p.key}
+                        onClick={() => pickService(p.key)}
+                        className={`relative flex flex-col overflow-hidden rounded-xl border p-5 text-left transition-all ${selected ? "border-gold bg-[rgba(245,200,66,0.06)] ring-1 ring-gold-dark" : "border-[#2a2b30] bg-[#0f1012] hover:border-gold-dark"
+                          }`}
+                      >
+                        <span className="absolute right-3 top-3 rounded bg-brand-yellow/15 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.5px] text-brand-yellow">
+                          −{p.save} zł
+                        </span>
+                        <span className={`font-display text-[16px] font-extrabold uppercase tracking-[0.5px] ${selected ? "text-gold" : "text-[#f0ede8]"}`}>
+                          {p.label}
+                        </span>
+                        <ul className="mt-3 flex flex-1 flex-col gap-1.5">
+                          {p.items.map((it) => (
+                            <li key={it} className="flex items-start gap-2 text-[12.5px] leading-snug text-[#a8a5a0]">
+                              <span className="mt-[3px] text-brand-yellow">✓</span>
+                              <span>{it}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <span className="mt-4 font-display text-[24px] font-extrabold text-gold">
+                          {p.base} zł <span className="text-[12px] font-normal text-[#7a7a82]">brutto</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <hr className={dividerCls} />
+                <Field label={svc ? svc.quantityLabel : "Ilość *"}>
+                  <input className={inputCls} type="number" min="1" max="20" value={fields.quantity} onChange={(e) => { setField("quantity", e.target.value); clearEstimate(); }} />
+                </Field>
+
                 <div className={sectionLabelCls}>Rodzaj usługi *</div>
                 <div className="col-span-full flex flex-wrap gap-3">
                   {serviceList.map((s) => (
                     <OptCard key={s.key} item={s} selected={currentType === s.key} error={errors.service} onClick={() => pickService(s.key)} />
                   ))}
                 </div>
-
-                {(
-                  <>
-                    <div className={`${sectionLabelCls} flex items-center gap-2`}>
-                      Pakiety <span className="rounded bg-brand-yellow px-1.5 py-0.5 text-[9px] font-bold text-ink-black">Oszczędzasz</span>
-                    </div>
-                    <div className="col-span-full grid grid-cols-1 gap-3 md:grid-cols-3">
-                      {PACKAGES.map((p) => {
-                        const selected = currentType === p.key;
-                        return (
-                          <button
-                            type="button"
-                            key={p.key}
-                            onClick={() => pickService(p.key)}
-                            className={`relative flex flex-col overflow-hidden rounded-xl border p-5 text-left transition-all ${
-                              selected ? "border-gold bg-[rgba(245,200,66,0.06)] ring-1 ring-gold-dark" : "border-[#2a2b30] bg-[#0f1012] hover:border-gold-dark"
-                            }`}
-                          >
-                            <span className="absolute right-3 top-3 rounded bg-brand-yellow/15 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.5px] text-brand-yellow">
-                              −{p.save} zł
-                            </span>
-                            <span className={`font-display text-[16px] font-extrabold uppercase tracking-[0.5px] ${selected ? "text-gold" : "text-[#f0ede8]"}`}>
-                              {p.label}
-                            </span>
-                            <ul className="mt-3 flex flex-1 flex-col gap-1.5">
-                              {p.items.map((it) => (
-                                <li key={it} className="flex items-start gap-2 text-[12.5px] leading-snug text-[#a8a5a0]">
-                                  <span className="mt-[3px] text-brand-yellow">✓</span>
-                                  <span>{it}</span>
-                                </li>
-                              ))}
-                            </ul>
-                            <span className="mt-4 font-display text-[24px] font-extrabold text-gold">
-                              {p.base} zł <span className="text-[12px] font-normal text-[#7a7a82]">brutto</span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                <Field label={svc ? svc.quantityLabel : "Ilość *"}>
-                  <input className={inputCls} type="number" min="1" max="20" value={fields.quantity} onChange={(e) => { setField("quantity", e.target.value); clearEstimate(); }} />
-                </Field>
 
                 {svc && svc.sizes && (
                   <>
@@ -619,15 +625,13 @@ export default function OrderForm({ mode = "kontenery" }) {
                                 type="button"
                                 key={a.key}
                                 onClick={() => toggleAddon(a.key)}
-                                className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3.5 text-left transition-all ${
-                                  checked ? "border-gold bg-[rgba(245,200,66,0.06)]" : "border-[#2a2b30] hover:border-gold-dark"
-                                }`}
+                                className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3.5 text-left transition-all ${checked ? "border-gold bg-[rgba(245,200,66,0.06)]" : "border-[#2a2b30] hover:border-gold-dark"
+                                  }`}
                               >
                                 <span className="flex items-center gap-3">
                                   <span
-                                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] ${
-                                      checked ? "border-gold bg-gold font-bold text-[#0f1012]" : "border-[#2a2b30]"
-                                    }`}
+                                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] ${checked ? "border-gold bg-gold font-bold text-[#0f1012]" : "border-[#2a2b30]"
+                                      }`}
                                   >
                                     {checked ? "✓" : ""}
                                   </span>
@@ -748,13 +752,12 @@ export default function OrderForm({ mode = "kontenery" }) {
                           type="button"
                           key={p.key}
                           onClick={() => { setPaymentMethod(p.key); setErrors((er) => ({ ...er, platnosc: false })); }}
-                          className={`flex-1 min-w-[130px] rounded-xl border px-5 py-3.5 text-left font-display text-[14px] font-bold uppercase tracking-[0.3px] transition-all ${
-                            errors.platnosc
+                          className={`flex-1 min-w-[130px] rounded-xl border px-5 py-3.5 text-left font-display text-[14px] font-bold uppercase tracking-[0.3px] transition-all ${errors.platnosc
                               ? "border-[#f04a4a]"
                               : paymentMethod === p.key
-                              ? "border-gold bg-[rgba(245,200,66,0.06)] text-gold"
-                              : "border-[#2a2b30] text-[#7a7a82] hover:border-gold-dark"
-                          }`}
+                                ? "border-gold bg-[rgba(245,200,66,0.06)] text-gold"
+                                : "border-[#2a2b30] text-[#7a7a82] hover:border-gold-dark"
+                            }`}
                         >
                           {p.label}
                         </button>
@@ -772,13 +775,57 @@ export default function OrderForm({ mode = "kontenery" }) {
                     onChange={(e) => setField("notes", e.target.value)}
                   />
                 </div>
+
+                {/* Zgody / regulaminy */}
+                <div
+                  className={`col-span-full flex flex-col gap-3 rounded-xl border p-5 text-[14px] ${errors.consents ? "border-[#f04a4a]" : "border-[#2a2b30]"
+                    }`}
+                >
+                  <Consent
+                    checked={consents.faktura}
+                    onChange={() => { setConsents((c) => ({ ...c, faktura: !c.faktura })); setErrors((e) => ({ ...e, consents: false })); }}
+                  >
+                    Zgoda na fakturę e-mail
+                  </Consent>
+                  <Consent
+                    checked={consents.odpady}
+                    onChange={() => { setConsents((c) => ({ ...c, odpady: !c.odpady })); setErrors((e) => ({ ...e, consents: false })); }}
+                  >
+                    Odpowiedzialność za odpady
+                  </Consent>
+                  <Consent
+                    checked={consents.regulamin}
+                    onChange={() => { setConsents((c) => ({ ...c, regulamin: !c.regulamin })); setErrors((e) => ({ ...e, consents: false })); }}
+                  >
+                    Akceptuję{" "}
+                    <button type="button" onClick={() => setLegalModal("regulamin")} className="text-gold underline hover:text-brand-yellow">Regulamin</button>,{" "}
+                    <button type="button" onClick={() => setLegalModal("uslug")} className="text-gold underline hover:text-brand-yellow">Regulamin świadczenia usług</button>{" "}oraz{" "}
+                    <button type="button" onClick={() => setLegalModal("rodo")} className="text-gold underline hover:text-brand-yellow">RODO</button>
+                  </Consent>
+                  <Consent
+                    checked={consents.odstapienie}
+                    onChange={() => { setConsents((c) => ({ ...c, odstapienie: !c.odstapienie })); setErrors((e) => ({ ...e, consents: false })); }}
+                  >
+                    Wyrażam zgodę na rozpoczęcie realizacji usługi przed upływem 14 dni od zawarcia umowy oraz przyjmuję
+                    do wiadomości, że po jej wykonaniu utracę prawo odstąpienia od umowy.
+                  </Consent>
+                  {errors.consents && (
+                    <p className="text-[13px] text-[#f04a4a]">Zaznacz wszystkie wymagane zgody.</p>
+                  )}
+                </div>
               </div>
 
               {submitError && (
                 <p className="mt-5 text-[14px] text-[#f04a4a]">{submitError}</p>
               )}
               <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-2 text-[13px] font-light text-[#7a7a82]">🔒 Dane chronione, bez spamu</div>
+                <a
+                  href="/odstapienie.pdf"
+                  download
+                  className="inline-flex items-center gap-2 rounded-full border border-[#2a2b30] px-5 py-3 font-display text-[13px] font-bold uppercase tracking-[0.3px] text-[#f0ede8] transition-all hover:border-gold hover:text-gold"
+                >
+                  ⬇ Wzór oświadczenia o odstąpieniu (PDF)
+                </a>
                 <button
                   onClick={submit}
                   disabled={submitting}
@@ -817,6 +864,22 @@ export default function OrderForm({ mode = "kontenery" }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {legalModal === "regulamin" && (
+        <LegalModal title="Regulamin sklepu internetowego BIALGRUZ" onClose={() => setLegalModal(null)}>
+          <Regulamin />
+        </LegalModal>
+      )}
+      {legalModal === "uslug" && (
+        <LegalModal title="Regulamin świadczenia usług — BIALGRUZ" onClose={() => setLegalModal(null)}>
+          <RegulaminUslug />
+        </LegalModal>
+      )}
+      {legalModal === "rodo" && (
+        <LegalModal title="Klauzula informacyjna RODO" onClose={() => setLegalModal(null)}>
+          <Rodo />
+        </LegalModal>
+      )}
     </div>
   );
 }
@@ -826,9 +889,8 @@ function Step({ active, done, num, label }) {
   return (
     <div className={`flex items-center gap-2 text-[13px] font-medium ${color}`}>
       <span
-        className={`grid h-[26px] w-[26px] place-items-center rounded-full border-[1.5px] border-current text-[11px] font-bold ${
-          done ? "bg-gold text-[#0f1012]" : active ? "bg-[#f0ede8] text-[#0f1012]" : ""
-        }`}
+        className={`grid h-[26px] w-[26px] place-items-center rounded-full border-[1.5px] border-current text-[11px] font-bold ${done ? "bg-gold text-[#0f1012]" : active ? "bg-[#f0ede8] text-[#0f1012]" : ""
+          }`}
       >
         {num}
       </span>
@@ -843,5 +905,22 @@ function Field({ label, error, children }) {
       <label className={labelCls}>{label}</label>
       <div className={error ? "[&_input]:border-[#f04a4a]" : ""}>{children}</div>
     </div>
+  );
+}
+
+function Consent({ checked, onChange, children }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 text-[14px] leading-snug text-[#d6d3ce]">
+      <button
+        type="button"
+        onClick={onChange}
+        aria-pressed={checked}
+        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] transition-all ${checked ? "border-gold bg-gold font-bold text-[#0f1012]" : "border-[#2a2b30]"
+          }`}
+      >
+        {checked ? "✓" : ""}
+      </button>
+      <span onClick={onChange}>{children}</span>
+    </label>
   );
 }
