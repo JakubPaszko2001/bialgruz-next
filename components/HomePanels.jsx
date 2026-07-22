@@ -30,7 +30,7 @@ function Feature({ icon, label }) {
 function Panel({ eyebrowless, title1, title2, chips, features, desc, href, img, imgAlt, imgClass, index }) {
   return (
     <motion.div
-      className="bg-diagonal group relative grid grid-rows-[1fr_auto] overflow-hidden p-8 sm:p-[52px]"
+      className="bg-diagonal group relative grid grid-rows-[1fr_auto] overflow-hidden p-6 sm:p-[52px]"
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: index * 0.12 }}
@@ -48,8 +48,8 @@ function Panel({ eyebrowless, title1, title2, chips, features, desc, href, img, 
 
       <div className="relative z-[2] flex max-w-[380px] flex-col">
         <h2 className="mb-7 font-display font-black uppercase leading-[0.88] tracking-[-1px]">
-          <span className="block text-[clamp(48px,5.5vw,80px)] text-white">{title1}</span>
-          <span className="block text-[clamp(48px,5.5vw,80px)] text-brand-yellow">{title2}</span>
+          <span className="block text-[clamp(40px,9vw,80px)] text-white">{title1}</span>
+          <span className="block text-[clamp(40px,9vw,80px)] text-brand-yellow">{title2}</span>
         </h2>
 
         <div className="mb-6 flex flex-wrap gap-2">
@@ -75,7 +75,7 @@ function Panel({ eyebrowless, title1, title2, chips, features, desc, href, img, 
         </Link>
       </div>
 
-      <div className={`pointer-events-none absolute z-[1] ${imgClass}`}>
+      <div className={`pointer-events-none absolute z-[1] opacity-20 sm:opacity-100 ${imgClass}`}>
         <Image
           src={img}
           alt={imgAlt}

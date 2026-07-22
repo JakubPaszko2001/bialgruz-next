@@ -23,7 +23,7 @@ export default function Locations() {
   }, [active]);
 
   return (
-    <section id="lokalizacje" className="flex min-h-screen items-center overflow-hidden bg-ink-black px-6 py-16 sm:px-[60px]">
+    <section id="lokalizacje" className="flex items-center overflow-hidden bg-ink-black px-6 py-16 sm:px-[60px] md:min-h-screen">
       <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-10 md:grid-cols-2">
         {/* Lewa strona — napisy */}
         <div>
