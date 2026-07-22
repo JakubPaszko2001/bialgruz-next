@@ -114,6 +114,27 @@ const TOILET_ADDONS_UMYWALKA = [
 // Limit dojazdu dla toalet: do 100 km cena z listy, powyżej — wycena indywidualna
 const TOILET_FREE_RADIUS_KM = 100;
 
+// Metadane do umowy: czas trwania i liczba serwisów/mies.
+const CONTRACT_META = {
+  t7dni: { days: 7, serwisy: 1 },
+  t1m1s: { months: 1, serwisy: 1 },
+  t1m2s: { months: 1, serwisy: 2 },
+  t1m4s: { months: 1, serwisy: 4 },
+  pkgRemont: { months: 3, serwisy: 2 },
+  pkgStandard: { months: 4, serwisy: 2 },
+  pkgMax: { months: 5, serwisy: 4 },
+};
+
+function computeEndDate(start, meta) {
+  if (!start) return null;
+  const d = new Date(start);
+  if (meta?.days) d.setDate(d.getDate() + meta.days);
+  if (meta?.months) d.setMonth(d.getMonth() + meta.months);
+  return d;
+}
+
+const plDate = (d) => (d ? d.toLocaleDateString("pl-PL") : "");
+
 
 // Tabele Supabase per tryb
 const TABLE_BY_MODE = { kontenery: "Zamówienia", toalety: "ToaletyZamowienia" };
@@ -221,6 +242,7 @@ export default function OrderForm({ mode = "kontenery" }) {
   const [addons, setAddons] = useState({}); // { kosz: true, ... }
   const [consents, setConsents] = useState({ faktura: false, odpady: false, regulamin: false, odstapienie: false });
   const [legalModal, setLegalModal] = useState(null); // "regulamin" | "uslug" | "rodo" | null
+  const [umowaLoading, setUmowaLoading] = useState(false);
   const [fields, setFields] = useState({
     name: "", phone: "", email: "", company: "", address: "", postcode: "", city: "", date: "", quantity: "1", notes: "",
   });
@@ -469,6 +491,60 @@ export default function OrderForm({ mode = "kontenery" }) {
     setAddons({});
     setConsents({ faktura: false, odpady: false, regulamin: false, odstapienie: false });
     clearEstimate();
+  }
+
+  // Wypełnij szablon umowy danymi z formularza i pobierz jako DOCX
+  async function downloadUmowa() {
+    setUmowaLoading(true);
+    try {
+      const html = await (await fetch("/Umowa.html")).text();
+      const qty = Math.max(1, parseInt(fields.quantity, 10) || 1);
+      const meta = CONTRACT_META[currentType] || {};
+      const start = fields.date ? new Date(fields.date) : null;
+      const addr = useCoords
+        ? coordsInput.trim()
+        : [fields.address.trim(), `${fields.postcode.trim()} ${fields.city.trim()}`.trim()].filter(Boolean).join(", ");
+      const typeLabel = svc?.isPackage ? "wg pakietu" : TOILET_TYPES.find((t) => t.key === toiletType)?.label || "";
+      const equip = availableAddons.filter((a) => addons[a.key]).map((a) => a.label).join(", ") || "Brak";
+      const jednostkowa = svc?.isPackage ? svc.base : (svc?.base ?? 0) + unitAddonsTotal;
+      const laczna = estimatedPrice != null ? estimatedPrice : jednostkowa * qty + orderAddonsTotal;
+
+      const data = {
+        data_awarcia: plDate(new Date()),
+        nr_umowy: "",
+        zleceniodawca_nazwa: fields.company.trim() || fields.name.trim(),
+        zleceniodawca_nip: fields.company.trim(),
+        zleceniodawca_adres: addr,
+        zleceniodawca_tel: fields.phone.trim(),
+        zleceniodawca_email: fields.email.trim(),
+        lokalizajca: addr,
+        ilosc_kabin: String(qty),
+        typ_kabiny: typeLabel,
+        wyposazenie: equip,
+        liczba_serwisow: meta.serwisy ? String(meta.serwisy) : "",
+        data_podstawienia: plDate(start),
+        data_zakonczenia: plDate(computeEndDate(start, meta)),
+        cena_jednostkowa: String(jednostkowa),
+        cena_laczna: String(laczna),
+      };
+
+      const filled = html.replace(/\{\{(\w+)\}\}/g, (_, k) => (data[k] != null ? data[k] : ""));
+      const { asBlob } = await import("html-docx-js/dist/html-docx");
+      const blob = asBlob(filled);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "umowa-BIALGRUZ.docx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Błąd generowania umowy:", err);
+      setSubmitError("Nie udało się wygenerować umowy DOCX.");
+    } finally {
+      setUmowaLoading(false);
+    }
   }
 
   return (
@@ -819,13 +895,25 @@ export default function OrderForm({ mode = "kontenery" }) {
                 <p className="mt-5 text-[14px] text-[#f04a4a]">{submitError}</p>
               )}
               <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
-                <a
-                  href="/odstapienie.pdf"
-                  download
-                  className="inline-flex items-center gap-2 rounded-full border border-[#2a2b30] px-5 py-3 font-display text-[13px] font-bold uppercase tracking-[0.3px] text-[#f0ede8] transition-all hover:border-gold hover:text-gold"
-                >
-                  ⬇ Wzór oświadczenia o odstąpieniu (PDF)
-                </a>
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    href="/odstapienie.pdf"
+                    download
+                    className="inline-flex items-center gap-2 rounded-full border border-[#2a2b30] px-5 py-3 font-display text-[13px] font-bold uppercase tracking-[0.3px] text-[#f0ede8] transition-all hover:border-gold hover:text-gold"
+                  >
+                    ⬇ Wzór oświadczenia o odstąpieniu (PDF)
+                  </a>
+                  {isToilet && (
+                    <button
+                      type="button"
+                      onClick={downloadUmowa}
+                      disabled={umowaLoading}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#2a2b30] px-5 py-3 font-display text-[13px] font-bold uppercase tracking-[0.3px] text-[#f0ede8] transition-all hover:border-gold hover:text-gold disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {umowaLoading ? "Generowanie…" : "⬇ Pobierz umowę (DOCX)"}
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={submit}
                   disabled={submitting}
