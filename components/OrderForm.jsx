@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "./supabaseClient";
 import LegalModal from "./LegalModal";
@@ -243,6 +243,14 @@ export default function OrderForm({ mode = "kontenery" }) {
   const [consents, setConsents] = useState({ faktura: false, odpady: false, regulamin: false, odstapienie: false });
   const [legalModal, setLegalModal] = useState(null); // "regulamin" | "uslug" | "rodo" | null
   const [umowaLoading, setUmowaLoading] = useState(false);
+  const rootRef = useRef(null);
+
+  // Po wysłaniu przewiń do góry potwierdzenia (po ustaniu animacji), żeby scroll nie skakał na dół
+  useEffect(() => {
+    if (!submitted) return;
+    const t = setTimeout(() => rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
+    return () => clearTimeout(t);
+  }, [submitted]);
   const [fields, setFields] = useState({
     name: "", phone: "", email: "", company: "", address: "", postcode: "", city: "", date: "", quantity: "1", notes: "",
   });
@@ -493,6 +501,35 @@ export default function OrderForm({ mode = "kontenery" }) {
     clearEstimate();
   }
 
+  // Szybkie wypełnienie formularza danymi testowymi
+  function fillTest() {
+    setCurrentType(isToilet ? "t1m2s" : "kontener");
+    setSelectedSize(isToilet ? null : "5m3");
+    setSelectedWaste(isToilet ? null : "gruz");
+    setToiletType(isToilet ? "std" : null);
+    setAddons(isToilet ? { kosz: true, swiatlo: true } : {});
+    setUseCoords(false);
+    setCoordsInput("");
+    setPaymentMethod("gotówka");
+    setConsents({ faktura: true, odpady: true, regulamin: true, odstapienie: true });
+    setFields({
+      name: "Jan Kowalski",
+      phone: "+48 500 000 000",
+      email: "jan@example.pl",
+      company: "",
+      address: "ul. Testowa 1",
+      postcode: "15-100",
+      city: "Białystok",
+      date: today,
+      quantity: "1",
+      notes: "Zamówienie testowe",
+    });
+    setErrors({});
+    setPriceError("");
+    setIndividualQuote(false);
+    setEstimatedPrice(500);
+  }
+
   // Wypełnij szablon umowy danymi z formularza i pobierz jako DOCX
   async function downloadUmowa() {
     setUmowaLoading(true);
@@ -548,7 +585,7 @@ export default function OrderForm({ mode = "kontenery" }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1140px] text-left font-sans text-[#f0ede8]">
+    <div ref={rootRef} className="mx-auto w-full max-w-[1140px] scroll-mt-24 text-left font-sans text-[#f0ede8]">
       {/* Step bar */}
       <div className="mb-9 flex items-center justify-center gap-3">
         <Step active={!submitted} done={submitted} num="1" label="Dane zamówienia" />
@@ -565,13 +602,22 @@ export default function OrderForm({ mode = "kontenery" }) {
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="mb-9">
-              <h2 className="font-display text-[26px] font-extrabold tracking-[-0.5px] text-gold">
-                {svc ? svc.title : "Zamów online"}
-              </h2>
-              <p className="mt-1 text-[14px] text-[#7a7a82]">
-                Wybierz usługę i wypełnij dane — wycenę zobaczysz od razu na stronie.
-              </p>
+            <div className="mb-9 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-display text-[26px] font-extrabold tracking-[-0.5px] text-gold">
+                  {svc ? svc.title : "Zamów online"}
+                </h2>
+                <p className="mt-1 text-[14px] text-[#7a7a82]">
+                  Wybierz usługę i wypełnij dane — wycenę zobaczysz od razu na stronie.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fillTest}
+                className="shrink-0 rounded-full border border-[#2a2b30] px-4 py-2 font-display text-[12px] font-bold uppercase tracking-[0.5px] text-[#7a7a82] transition-all hover:border-gold hover:text-gold"
+              >
+                Test
+              </button>
             </div>
 
             <div className="rounded-2xl border border-[#2a2b30] bg-[#18191d] p-6 sm:p-10">

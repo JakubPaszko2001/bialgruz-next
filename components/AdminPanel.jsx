@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseClient";
-import { FaEdit, FaTrash, FaSort, FaSortUp, FaSortDown, FaFilePdf, FaSignOutAlt } from "react-icons/fa";
+import { FaEdit, FaTrash, FaSort, FaSortUp, FaSortDown, FaFilePdf, FaFileWord, FaSignOutAlt } from "react-icons/fa";
 
 /* ── Style tokens (spójne z formularzem zamówień) ── */
 const inputCls =
@@ -44,7 +44,7 @@ const searchableFields = [
   "rodzajuslugi", "rodzajodpadu", "message", "platnosc", "Status",
 ];
 
-export default function AdminPanel({ onLogout, table = "Zamówienia", title = "Panel zamówień", fields = CONTAINER_FIELDS }) {
+export default function AdminPanel({ onLogout, table = "Zamówienia", title = "Panel zamówień", fields = CONTAINER_FIELDS, showUmowa = false }) {
   const allFields = fields;
   const [orders, setOrders] = useState([]);
   const [editOrder, setEditOrder] = useState(null);
@@ -170,21 +170,97 @@ export default function AdminPanel({ onLogout, table = "Zamówienia", title = "P
     const { jsPDF } = await import("jspdf");
     const autoTable = (await import("jspdf-autotable")).default;
     const doc = new jsPDF({ unit: "pt", format: "a4" });
-    doc.setFontSize(18);
-    doc.text("Karta zlecenia", 40, 40);
-    const rows = allFields.map((f) => [labelFor(f), String(order?.[f] ?? "")]);
+
+    // Font Unicode z polskimi znakami (DejaVu Sans)
+    try {
+      const buf = await (await fetch("/fonts/DejaVuSans.ttf")).arrayBuffer();
+      let bin = "";
+      const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      const base64 = btoa(bin);
+      doc.addFileToVFS("DejaVuSans.ttf", base64);
+      doc.addFont("DejaVuSans.ttf", "DejaVu", "normal");
+      doc.setFont("DejaVu", "normal");
+    } catch (e) {
+      console.error("Nie udało się załadować fontu PDF:", e);
+    }
+
+    doc.setFontSize(16);
+    doc.text(`Karta zlecenia ${order?.numerZlecenia || ""}`.trim(), 40, 40);
+
+    // Wypisz wszystkie pola obecne w rekordzie (pełny zestaw + ewentualne dodatkowe klucze)
+    const keys = [...allFields, ...Object.keys(order || {}).filter((k) => k !== "id" && !allFields.includes(k))];
+    const rows = keys.map((f) => {
+      let v = order?.[f];
+      if ((f === "dataUtworzenia" || f === "dataDostawy") && v) v = new Date(v).toLocaleDateString("pl-PL");
+      return [labelFor(f), v == null ? "" : String(v)];
+    });
+
     autoTable(doc, {
-      startY: 80,
-      head: [["Pole", "Wartosc"]],
+      startY: 64,
+      head: [["Pole", "Wartość"]],
       body: rows,
-      styles: { fontSize: 10, cellPadding: 6, valign: "middle" },
-      headStyles: { fillColor: [245, 200, 66], textColor: 0, halign: "left" },
-      columnStyles: { 0: { cellWidth: 160 } },
+      styles: { font: "DejaVu", fontStyle: "normal", fontSize: 10, cellPadding: 6, valign: "middle", overflow: "linebreak" },
+      headStyles: { font: "DejaVu", fontStyle: "normal", fillColor: [245, 200, 66], textColor: 0, halign: "left" },
+      columnStyles: { 0: { cellWidth: 170 }, 1: { cellWidth: "auto" } },
       theme: "grid",
       tableLineColor: [245, 200, 66],
       tableLineWidth: 0.5,
     });
     doc.save(`zlecenie_${order?.numerZlecenia || order?.id || "pdf"}.pdf`);
+  };
+
+  // Umowa DOCX wypełniona danymi zamówienia (ten sam szablon co w formularzu)
+  const handleDownloadUmowa = async (order) => {
+    const html = await (await fetch("/Umowa.html")).text();
+    const plDate = (v) => (v ? new Date(v).toLocaleDateString("pl-PL") : "");
+    const ru = order.rodzajuslugi || "";
+    const typ = /umywalk/i.test(ru) ? "Z umywalką" : /standard/i.test(ru) ? "Standardowa" : /pakiet/i.test(ru) ? "wg pakietu" : "";
+    const serw = ru.match(/(\d+)\s*serwis/i);
+    const equip = (() => {
+      const part = (order.message || "").split(/Wyposażenie:/i)[1];
+      if (!part) return "Brak";
+      return (
+        part
+          .split("\n")
+          .map((s) => s.replace(/^[•\s]+/, "").trim())
+          .filter(Boolean)
+          .join(", ") || "Brak"
+      );
+    })();
+    const addr = order.koordynaty
+      ? order.koordynaty
+      : [order.address, `${order.postcode || ""} ${order.city || ""}`.trim()].filter(Boolean).join(", ");
+
+    const data = {
+      data_awarcia: plDate(order.dataUtworzenia) || new Date().toLocaleDateString("pl-PL"),
+      nr_umowy: order.numerZlecenia || "",
+      zleceniodawca_nazwa: (order.nip || "").trim() || [order.name, order.forname].filter(Boolean).join(" "),
+      zleceniodawca_nip: order.nip || "",
+      zleceniodawca_adres: addr,
+      zleceniodawca_tel: order.phone || "",
+      zleceniodawca_email: order.email || "",
+      lokalizajca: addr,
+      ilosc_kabin: order.ilosc != null ? String(order.ilosc) : "",
+      typ_kabiny: typ,
+      wyposazenie: equip,
+      liczba_serwisow: serw ? serw[1] : "",
+      data_podstawienia: plDate(order.dataDostawy),
+      data_zakonczenia: "",
+      cena_jednostkowa: "",
+      cena_laczna: order.szacowany || "",
+    };
+
+    const filled = html.replace(/\{\{(\w+)\}\}/g, (_, k) => (data[k] != null ? data[k] : ""));
+    const { asBlob } = await import("html-docx-js/dist/html-docx");
+    const url = URL.createObjectURL(asBlob(filled));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `umowa_${order.numerZlecenia || order.id}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const fmtCell = (order, field) => {
@@ -280,6 +356,9 @@ export default function AdminPanel({ onLogout, table = "Zamówienia", title = "P
                     <button onClick={() => handleEdit(order)} className="text-gold transition-colors hover:text-white" title="Edytuj"><FaEdit /></button>
                     <button onClick={() => setDeleteTarget(order.id)} className="text-[#f04a4a] transition-colors hover:text-white" title="Usuń"><FaTrash /></button>
                     <button onClick={() => handleDownloadPdf(order)} className="text-[#7a7a82] transition-colors hover:text-gold" title="Pobierz PDF"><FaFilePdf /></button>
+                    {showUmowa && (
+                      <button onClick={() => handleDownloadUmowa(order)} className="text-[#7a7a82] transition-colors hover:text-gold" title="Pobierz umowę (DOCX)"><FaFileWord /></button>
+                    )}
                   </div>
                 </td>
               </tr>

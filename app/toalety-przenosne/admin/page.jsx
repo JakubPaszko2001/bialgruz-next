@@ -79,6 +79,7 @@ export default function ToaletyAdminPage() {
         table="ToaletyZamowienia"
         title="Panel toalet"
         fields={ADMIN_FIELD_SETS.toilet}
+        showUmowa
       />
     </div>
   );
