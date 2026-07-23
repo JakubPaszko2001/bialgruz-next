@@ -7,6 +7,7 @@ import LegalModal from "./LegalModal";
 import Regulamin from "@/Components2/Regulamin";
 import RegulaminUslug from "@/Components2/RegulaminUslug";
 import Rodo from "./Rodo";
+import { downloadUmowaPdf } from "./umowaPdf";
 
 /* ── Pricing data ── */
 const SERVICES = {
@@ -530,11 +531,10 @@ export default function OrderForm({ mode = "kontenery" }) {
     setEstimatedPrice(500);
   }
 
-  // Wypełnij szablon umowy danymi z formularza i pobierz jako DOCX
+  // Wypełnij szablon umowy danymi z formularza i pobierz jako PDF
   async function downloadUmowa() {
     setUmowaLoading(true);
     try {
-      const html = await (await fetch("/Umowa.html")).text();
       const qty = Math.max(1, parseInt(fields.quantity, 10) || 1);
       const meta = CONTRACT_META[currentType] || {};
       const start = fields.date ? new Date(fields.date) : null;
@@ -565,20 +565,10 @@ export default function OrderForm({ mode = "kontenery" }) {
         cena_laczna: String(laczna),
       };
 
-      const filled = html.replace(/\{\{(\w+)\}\}/g, (_, k) => (data[k] != null ? data[k] : ""));
-      const { asBlob } = await import("html-docx-js/dist/html-docx");
-      const blob = asBlob(filled);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "umowa-BIALGRUZ.docx";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadUmowaPdf(data, "umowa-BIALGRUZ.pdf");
     } catch (err) {
       console.error("Błąd generowania umowy:", err);
-      setSubmitError("Nie udało się wygenerować umowy DOCX.");
+      setSubmitError("Nie udało się wygenerować umowy PDF.");
     } finally {
       setUmowaLoading(false);
     }
@@ -956,7 +946,7 @@ export default function OrderForm({ mode = "kontenery" }) {
                       disabled={umowaLoading}
                       className="inline-flex items-center gap-2 rounded-full border border-[#2a2b30] px-5 py-3 font-display text-[13px] font-bold uppercase tracking-[0.3px] text-[#f0ede8] transition-all hover:border-gold hover:text-gold disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {umowaLoading ? "Generowanie…" : "⬇ Pobierz umowę (DOCX)"}
+                      {umowaLoading ? "Generowanie…" : "⬇ Pobierz umowę (PDF)"}
                     </button>
                   )}
                 </div>

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseClient";
-import { FaEdit, FaTrash, FaSort, FaSortUp, FaSortDown, FaFilePdf, FaFileWord, FaSignOutAlt } from "react-icons/fa";
+import { FaEdit, FaTrash, FaSort, FaSortUp, FaSortDown, FaFilePdf, FaFileContract, FaSignOutAlt } from "react-icons/fa";
+import { downloadUmowaPdf } from "./umowaPdf";
 
 /* ── Style tokens (spójne z formularzem zamówień) ── */
 const inputCls =
@@ -210,9 +211,8 @@ export default function AdminPanel({ onLogout, table = "Zamówienia", title = "P
     doc.save(`zlecenie_${order?.numerZlecenia || order?.id || "pdf"}.pdf`);
   };
 
-  // Umowa DOCX wypełniona danymi zamówienia (ten sam szablon co w formularzu)
+  // Umowa PDF wypełniona danymi zamówienia (ten sam szablon co w formularzu)
   const handleDownloadUmowa = async (order) => {
-    const html = await (await fetch("/Umowa.html")).text();
     const plDate = (v) => (v ? new Date(v).toLocaleDateString("pl-PL") : "");
     const ru = order.rodzajuslugi || "";
     const typ = /umywalk/i.test(ru) ? "Z umywalką" : /standard/i.test(ru) ? "Standardowa" : /pakiet/i.test(ru) ? "wg pakietu" : "";
@@ -251,16 +251,7 @@ export default function AdminPanel({ onLogout, table = "Zamówienia", title = "P
       cena_laczna: order.szacowany || "",
     };
 
-    const filled = html.replace(/\{\{(\w+)\}\}/g, (_, k) => (data[k] != null ? data[k] : ""));
-    const { asBlob } = await import("html-docx-js/dist/html-docx");
-    const url = URL.createObjectURL(asBlob(filled));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `umowa_${order.numerZlecenia || order.id}.docx`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    await downloadUmowaPdf(data, `umowa_${order.numerZlecenia || order.id}.pdf`);
   };
 
   const fmtCell = (order, field) => {
@@ -357,7 +348,7 @@ export default function AdminPanel({ onLogout, table = "Zamówienia", title = "P
                     <button onClick={() => setDeleteTarget(order.id)} className="text-[#f04a4a] transition-colors hover:text-white" title="Usuń"><FaTrash /></button>
                     <button onClick={() => handleDownloadPdf(order)} className="text-[#7a7a82] transition-colors hover:text-gold" title="Pobierz PDF"><FaFilePdf /></button>
                     {showUmowa && (
-                      <button onClick={() => handleDownloadUmowa(order)} className="text-[#7a7a82] transition-colors hover:text-gold" title="Pobierz umowę (DOCX)"><FaFileWord /></button>
+                      <button onClick={() => handleDownloadUmowa(order)} className="text-[#7a7a82] transition-colors hover:text-gold" title="Pobierz umowę (PDF)"><FaFileContract /></button>
                     )}
                   </div>
                 </td>
