@@ -30,7 +30,7 @@ function Feature({ icon, label }) {
 function Panel({ eyebrowless, title1, title2, chips, features, desc, href, img, imgAlt, imgClass, index }) {
   return (
     <motion.div
-      className="bg-diagonal group relative grid grid-rows-[1fr_auto] overflow-hidden p-6 sm:p-[52px]"
+      className="bg-diagonal group relative grid min-h-[calc(100svh-64px)] grid-rows-[1fr_auto] overflow-hidden p-6 sm:p-[52px] md:min-h-0"
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: index * 0.12 }}
@@ -46,7 +46,7 @@ function Panel({ eyebrowless, title1, title2, chips, features, desc, href, img, 
         }}
       />
 
-      <div className="relative z-[2] flex max-w-[380px] flex-col">
+      <div className="relative z-[2] flex max-w-[380px] flex-col pt-2 md:self-center md:pt-0">
         <h2 className="mb-7 font-display font-black uppercase leading-[0.88] tracking-[-1px]">
           <span className="block text-[clamp(40px,9vw,80px)] text-white">{title1}</span>
           <span className="block text-[clamp(40px,9vw,80px)] text-brand-yellow">{title2}</span>
@@ -73,16 +73,16 @@ function Panel({ eyebrowless, title1, title2, chips, features, desc, href, img, 
           Wybierz katalog
           <ArrowIcon />
         </Link>
-      </div>
 
-      <div className={`pointer-events-none absolute z-[1] opacity-20 sm:opacity-100 ${imgClass}`}>
-        <Image
-          src={img}
-          alt={imgAlt}
-          width={600}
-          height={800}
-          className="w-full drop-shadow-[0_24px_56px_rgba(0,0,0,0.7)] transition-transform duration-500 group-hover:-translate-y-2.5 group-hover:scale-105"
-        />
+        <div className={`mx-auto my-auto block w-[65%] max-w-[240px] md:pointer-events-none md:absolute md:my-0 md:-z-10 md:w-auto md:max-w-none ${imgClass}`}>
+          <Image
+            src={img}
+            alt={imgAlt}
+            width={600}
+            height={800}
+            className="w-full drop-shadow-[0_24px_56px_rgba(0,0,0,0.7)] transition-transform duration-500 group-hover:-translate-y-2.5 group-hover:scale-105"
+          />
+        </div>
       </div>
     </motion.div>
   );
@@ -126,7 +126,7 @@ export default function HomePanels() {
         href="/toalety-przenosne"
         img="/toaleta-bialgruz.png"
         imgAlt="Toaleta przenośna Białgruz"
-        imgClass="right-[-10px] top-1/2 w-[42%] -translate-y-1/2"
+        imgClass="md:right-[-10px] md:top-1/2 md:w-[42%] md:-translate-y-1/2"
       />
 
       <Panel
@@ -158,7 +158,7 @@ export default function HomePanels() {
         href="/kontenery"
         img="/kontener-bialgruz.png"
         imgAlt="Kontener na gruz Białgruz"
-        imgClass="right-[-20px] bottom-[15%] w-[56%]"
+        imgClass="md:right-[-20px] md:bottom-[15%] md:w-[56%]"
       />
     </div>
   );

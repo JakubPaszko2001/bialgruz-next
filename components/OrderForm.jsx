@@ -70,9 +70,8 @@ function parseCoordinates(input) {
 }
 
 const PAYMENT_METHODS = [
-  { key: "gotówka", label: "Gotówka" },
-  { key: "karta", label: "Karta / BLIK" },
-  { key: "przelew", label: "Przelew" },
+  { key: "online", label: "Płatność online (PayU)" },
+  { key: "gotówka", label: "Gotówką" },
 ];
 
 // Kolejny numer zlecenia: kontenery = BIALxxxx, toalety = TOAxxxx
